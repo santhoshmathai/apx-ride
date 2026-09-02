@@ -62,6 +62,18 @@ export async function PATCH(req: Request) {
   }
 }
 
+export async function PUT(req: Request) {
+  try {
+    const ownerId = await authenticatedOwner();
+    await ready();
+    const b = await req.json() as Record<string, unknown>;
+    await env.DB.prepare(`UPDATE bookings SET passenger_name=?,phone=?,pickup=?,dropoff=?,pickup_at=?,operator=?,passengers=?,large_bags=?,small_bags=?,fleet_tier=?,distance=?,fare=?,notes=?,updated_at=? WHERE id=? AND owner_id=?`).bind(b.passengerName||'Unnamed passenger',b.phone||'',b.pickup||'',b.dropoff||'',b.pickupAt||new Date().toISOString(),b.operator||'APX RIDE',b.passengers||1,b.largeBags||0,b.smallBags||0,b.fleetTier||'Saloon',b.distance||0,b.fare||0,b.notes||'',new Date().toISOString(),b.id,ownerId).run();
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return authError(error);
+  }
+}
+
 export async function DELETE(req: Request) {
   try {
     const ownerId = await authenticatedOwner();
