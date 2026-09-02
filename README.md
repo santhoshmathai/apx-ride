@@ -216,7 +216,8 @@ The portal can contain personal and commercially sensitive information. Producti
 
 ## Known MVP limitations
 
-- External tester self-registration is not implemented.
+- Portal access requires Sign in with ChatGPT and an owner-managed email allowlist.
+- Testers cannot self-register for portal access; the owner adds their exact ChatGPT account email to the hosted `ALLOWED_EMAILS` secret.
 - Booking editing is not yet exposed in the interface.
 - Archived-record recovery is not yet exposed in the interface.
 - Expenses are represented in the dashboard but do not yet have a persistent entry form.
@@ -240,4 +241,3 @@ The portal can contain personal and commercially sensitive information. Producti
 ## Repository
 
 <https://github.com/santhoshmathai/apx-ride>
-
