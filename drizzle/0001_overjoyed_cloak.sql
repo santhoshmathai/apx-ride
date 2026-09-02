@@ -1,0 +1,1 @@
+ALTER TABLE `bookings` ADD `booking_type` text DEFAULT 'CASH' NOT NULL;
