@@ -1608,9 +1608,9 @@ function Calendar({ items }: { items: Booking[] }) {
             ))}
             {month.map((d, i) => {
               const key = d.toISOString().slice(0, 10),
-                count = jobs.filter(
+                dayJobs = jobs.filter(
                   (j) => j.pickup_at.slice(0, 10) === key,
-                ).length;
+                );
               return (
                 <button
                   key={i}
@@ -1628,10 +1628,32 @@ function Calendar({ items }: { items: Booking[] }) {
                   }
                 >
                   <span>{d.getDate()}</span>
-                  {count > 0 && (
-                    <small>
-                      {count} job{count > 1 ? 's' : ''}
-                    </small>
+                  {dayJobs.length > 0 && (
+                    <div className="calendar-day-jobs">
+                      {dayJobs.slice(0, 2).map((job) => (
+                        <div
+                          className="calendar-day-job"
+                          key={job.id}
+                          title={`${job.pickup} to ${job.dropoff} · ${job.id}`}
+                        >
+                          <strong>
+                            {job.pickup} → {job.dropoff}
+                          </strong>
+                          <small>
+                            {fmtTime(job.pickup_at)} · {job.operator}
+                          </small>
+                          <small className="calendar-job-ref">
+                            {job.id} · {job.status.replace('_', ' ')}
+                          </small>
+                        </div>
+                      ))}
+                      {dayJobs.length > 2 && (
+                        <small className="calendar-more-jobs">
+                          +{dayJobs.length - 2} more job
+                          {dayJobs.length - 2 > 1 ? 's' : ''}
+                        </small>
+                      )}
+                    </div>
                   )}
                   {unavailable(key) && <em>Unavailable</em>}
                 </button>

@@ -75,6 +75,61 @@
   line-height: 1.2;
 }
 
+.month-grid > button {
+  min-height: 148px;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.calendar-day-jobs {
+  display: grid;
+  width: 100%;
+  gap: 7px;
+}
+
+.calendar-day-job {
+  min-width: 0;
+  padding: 7px 8px;
+  border-left: 3px solid #d8aa2d;
+  border-radius: 5px;
+  background: #202224;
+}
+
+.calendar-day-job strong {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #f3f3f3;
+  font-size: 0.76rem;
+  line-height: 1.3;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.month-grid .calendar-day-job small {
+  display: block;
+  overflow: hidden;
+  margin-top: 4px;
+  color: #e1bb50;
+  font-size: 0.68rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.month-grid .calendar-day-job .calendar-job-ref {
+  margin-top: 3px;
+  color: #85898c;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+}
+
+.month-grid .calendar-more-jobs {
+  margin-top: 0;
+  color: #c5a64d;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
 @media (max-width: 1200px) {
   .fast-bar .fast-grid.top,
   .fast-bar .fast-grid.bottom {
@@ -99,5 +154,15 @@
   .document-preview .preview-actions button,
   .document-preview .preview-actions .primary {
     white-space: normal;
+  }
+
+  .month-grid {
+    grid-template-columns: repeat(7, minmax(125px, 1fr));
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+
+  .month-grid > button {
+    min-height: 138px;
   }
 }
