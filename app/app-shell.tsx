@@ -30,6 +30,8 @@ type Booking = {
   pickup_at: string;
   operator: string;
   booking_type?: 'CASH' | 'ACCOUNT';
+  payment_method?: 'CASH' | 'CARD' | '';
+  account_status?: 'pending' | 'settled';
   passengers: number;
   large_bags: number;
   small_bags: number;
@@ -102,11 +104,16 @@ export function AppShell() {
     setModal(undefined);
     await refresh();
   };
-  const status = async (id: number, s: string) => {
+  const status = async (
+    id: number,
+    s: string,
+    paymentMethod?: string,
+    accountStatus?: string,
+  ) => {
     await fetch('/api/bookings', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ id, status: s }),
+      body: JSON.stringify({ id, status: s, paymentMethod, accountStatus }),
     });
     await refresh();
   };
@@ -131,22 +138,26 @@ export function AppShell() {
       />
       {mobile && <button className="scrim" onClick={() => setMobile(false)} />}
       <section className="workspace">
-        <header className="topbar">
+        <header
+          className={`topbar ${active === 'Dashboard' ? 'dashboard-topbar' : ''}`}
+        >
           <button className="menu" onClick={() => setMobile(true)}>
             <Menu />
           </button>
-          <div>
-            <small>
-              {new Date()
-                .toLocaleDateString('en-GB', {
-                  weekday: 'long',
-                  day: '2-digit',
-                  month: 'long',
-                })
-                .toUpperCase()}
-            </small>
-            <h1>{active}</h1>
-          </div>
+          {active !== 'Dashboard' && (
+            <div>
+              <small>
+                {new Date()
+                  .toLocaleDateString('en-GB', {
+                    weekday: 'long',
+                    day: '2-digit',
+                    month: 'long',
+                  })
+                  .toUpperCase()}
+              </small>
+              <h1>{active}</h1>
+            </div>
+          )}
           <button className="primary" onClick={() => setModal(null)}>
             <Plus />
             New booking
@@ -184,7 +195,9 @@ export function AppShell() {
           )}
           {active === 'Calendar' && <Calendar items={bookings} />}{' '}
           {active === 'Messages' && <Messages items={bookings} />}{' '}
-          {active === 'Earnings' && <Earnings items={bookings} />}
+          {active === 'Earnings' && (
+            <EarningsV2 items={bookings} status={status} />
+          )}
           {active === 'Settings' && (
             <SettingsPage
               operators={operators}
@@ -291,17 +304,19 @@ function Dashboard({
     earn = done.reduce((a, b) => a + b.fare, 0);
   return (
     <>
-      <section className="brand-banner">
-        <img src="/apx-header.png" alt="APX Ride — Elevate every mile" />
-      </section>
-      <section className="welcome">
+      <div className="dashboard-hero">
         <div>
-          <small>OPERATIONS DESK</small>
-          <h2>Good day, Santhosh.</h2>
-          <p>Bookings, dispatch and quotes in one live workspace.</p>
+          <section className="welcome">
+            <div>
+              <small>OPERATIONS DESK</small>
+              <h2>Good day, Santhosh.</h2>
+              <p>Bookings, dispatch and quotes in one live workspace.</p>
+            </div>
+          </section>
+          <Dispatch next={next} go={go} />
         </div>
-        <button onClick={() => go('Calendar')}>View calendar →</button>
-      </section>
+        <LiveClock go={() => go('Calendar')} />
+      </div>
       <div className="stats">
         <Stat
           icon={PoundSterling}
@@ -322,16 +337,36 @@ function Dashboard({
           detail={`${operators.length} booking sources`}
         />
       </div>
-      <div className="grid">
-        <Dispatch next={next} go={go} />
-        <QuickQuote
-          rates={rates}
-          fuelRate={fuelRate}
-          go={() => go('Calculator')}
-        />
-      </div>
       <FastBooking operators={operators} save={save} />
     </>
+  );
+}
+function LiveClock({ go }: { go: () => void }) {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <section className="panel clock-widget">
+      <small>LOCAL TIME · LONDON</small>
+      <b>
+        {now.toLocaleTimeString('en-GB', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        })}
+      </b>
+      <span>
+        {now.toLocaleDateString('en-GB', {
+          weekday: 'long',
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
+        })}
+      </span>
+      <button onClick={go}>Open calendar →</button>
+    </section>
   );
 }
 function Dispatch({ next, go }: { next?: Booking; go: (s: string) => void }) {
@@ -443,8 +478,9 @@ function FastBooking({
     const d = Object.fromEntries(new FormData(e.currentTarget));
     save({
       ...d,
-      pickupAt: d.pickupAt || new Date().toISOString(),
+      pickupAt: `${d.pickupDate}T${d.pickupTime}`,
       passengers: 1,
+      largeBags: d.bags,
       status: 'upcoming',
     });
     e.currentTarget.reset();
@@ -453,21 +489,66 @@ function FastBooking({
     <section className="panel fast-bar">
       <Head over="FAST QUOTE & BOOKING BAR" title="Quick-save a job" />
       <form onSubmit={submit}>
-        <input name="passengerName" placeholder="Passenger" required />
-        <select name="operator">
-          {operators.map((o) => (
-            <option key={o}>{o}</option>
-          ))}
-        </select>
-        <select name="bookingType" aria-label="Booking type">
-          <option value="CASH">CASH</option>
-          <option value="ACCOUNT">ACCOUNT</option>
-        </select>
-        <input name="pickup" placeholder="Pickup" required />
-        <input name="dropoff" placeholder="Drop-off" required />
-        <input name="pickupAt" type="datetime-local" required />
-        <input name="fare" type="number" step="0.01" placeholder="Fare £" />
-        <button className="primary">
+        <div className="fast-grid top">
+          <label>
+            Pickup address
+            <input name="pickup" required />
+          </label>
+          <label>
+            Drop-off address
+            <input name="dropoff" required />
+          </label>
+          <label>
+            Pickup date
+            <input name="pickupDate" type="date" required />
+          </label>
+          <label>
+            Pickup time
+            <input name="pickupTime" type="time" required />
+          </label>
+          <label>
+            Bags / luggage
+            <input name="bags" type="number" min="0" defaultValue="0" />
+          </label>
+        </div>
+        <div className="fast-grid bottom">
+          <label>
+            Fleet tier
+            <select name="fleetTier">
+              {Object.keys(defaultRates).map((x) => (
+                <option key={x}>{x}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Operator
+            <select name="operator">
+              {operators.map((o) => (
+                <option key={o}>{o}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Job type
+            <select name="bookingType">
+              <option value="CASH">CASH</option>
+              <option value="ACCOUNT">ACCOUNT</option>
+            </select>
+          </label>
+          <label>
+            Fare (£)
+            <input name="fare" type="number" step="0.01" min="0" />
+          </label>
+        </div>
+        <label className="fast-note">
+          Note
+          <textarea
+            name="notes"
+            rows={3}
+            placeholder="Passenger, flight, pickup or dispatch notes"
+          />
+        </label>
+        <button className="primary fast-save">
           <Save />
           Save
         </button>
@@ -487,22 +568,25 @@ function Bookings({
 }: {
   items: Booking[];
   loading: boolean;
-  done: (id: number, s: string) => void;
+  done: (id: number, s: string, paymentMethod?: string) => void;
   remove: (id: number) => void;
   view: (b: Booking) => void;
   edit: (b: Booking) => void;
   add: () => void;
 }) {
-  const [tab, setTab] = useState<'active' | 'complete'>('active');
+  const [tab, setTab] = useState<'active' | 'progress' | 'complete'>('active');
+  const [finishing, setFinishing] = useState<Booking | null>(null);
   const shown = items.filter((b) =>
     tab === 'complete'
       ? b.status === 'complete'
-      : b.status !== 'complete' && b.status !== 'archived',
+      : tab === 'progress'
+        ? b.status === 'in_progress'
+        : b.status === 'upcoming',
   );
   return (
     <Page
       title="Booking control"
-      sub="Active and completed jobs are kept in separate views."
+      sub="Move each dispatch from scheduled to en route, then confirm payment at completion."
       action={
         <button className="primary" onClick={add}>
           <Plus />
@@ -516,6 +600,13 @@ function Bookings({
           onClick={() => setTab('active')}
         >
           Active jobs
+        </button>
+        <button
+          className={tab === 'progress' ? 'active' : ''}
+          onClick={() => setTab('progress')}
+        >
+          In Progress / En Route (
+          {items.filter((b) => b.status === 'in_progress').length})
         </button>
         <button
           className={tab === 'complete' ? 'active' : ''}
@@ -550,12 +641,18 @@ function Bookings({
               <button onClick={() => edit(b)} title="Edit booking">
                 <Pencil />
               </button>
-              {b.status !== 'complete' && (
+              {b.status === 'upcoming' && (
                 <button
-                  onClick={() => done(b.id, 'complete')}
-                  title="Mark complete"
+                  onClick={() => done(b.id, 'in_progress')}
+                  title="Move to In Progress / En Route"
                 >
+                  En route
+                </button>
+              )}
+              {b.status === 'in_progress' && (
+                <button onClick={() => setFinishing(b)} title="Finish job">
                   <Check />
+                  Finish
                 </button>
               )}
               <button onClick={() => remove(b.id)} title="Remove">
@@ -565,7 +662,66 @@ function Bookings({
           </article>
         ))}
       </div>
+      {finishing && (
+        <PaymentModal
+          booking={finishing}
+          close={() => setFinishing(null)}
+          confirm={(method) => {
+            done(finishing.id, 'complete', method);
+            setFinishing(null);
+            setTab('complete');
+          }}
+        />
+      )}
     </Page>
+  );
+}
+
+function PaymentModal({
+  booking,
+  close,
+  confirm,
+}: {
+  booking: Booking;
+  close: () => void;
+  confirm: (method: 'CASH' | 'CARD') => void;
+}) {
+  const [method, setMethod] = useState<'CASH' | 'CARD'>('CASH');
+  return (
+    <div className="modal">
+      <button className="scrim" onClick={close} />
+      <section className="payment-card">
+        <header>
+          <div>
+            <small>FINISH JOB</small>
+            <h2>Confirm payment</h2>
+          </div>
+          <button onClick={close}>
+            <X />
+          </button>
+        </header>
+        <p>
+          {booking.passenger_name} · £{booking.fare.toFixed(2)}
+        </p>
+        <label>
+          Payment method
+          <select
+            value={method}
+            onChange={(e) => setMethod(e.target.value as 'CASH' | 'CARD')}
+          >
+            <option>CASH</option>
+            <option>CARD</option>
+          </select>
+        </label>
+        <footer>
+          <button onClick={close}>Cancel</button>
+          <button className="primary" onClick={() => confirm(method)}>
+            <Check />
+            Complete job
+          </button>
+        </footer>
+      </section>
+    </div>
   );
 }
 
@@ -815,11 +971,6 @@ function Calculator({
               <dt>Vehicle specification</dt>
               <dd>{tier}</dd>
             </div>
-            <Line k="Base minimum" v={cfg.base} />
-            <Line k={`Distance · Model ${model}`} v={distanceCharge} />
-            <Line k="Journey / waiting" v={durationCharge} />
-            <Line k="Fuel expense" v={fuelCost} />
-            <Line k="Airport fee" v={airport} />
           </dl>
           {doc === 'confirmation' && (
             <section className="schedule-block">
@@ -844,11 +995,6 @@ function Calculator({
             </span>
             <b>£{total.toFixed(2)}</b>
           </div>
-          <p className="formula">
-            {fixed
-              ? 'Fixed fare override applied'
-              : `£${cfg.base} + ${miles} miles × £${cfg.rate} + extras`}
-          </p>
           {doc === 'confirmation' && (
             <p className="terms">
               <b>Terms & Conditions:</b> Thank you for selecting APX RIDE. Your
@@ -867,7 +1013,7 @@ function Calculator({
             </button>
             <button className="primary" onClick={() => save(payload)}>
               <Save />
-              Save job to bookings
+              Save This Booking
             </button>
           </div>
         </section>
@@ -1217,6 +1363,26 @@ function BookingModal({
             />
           </label>
           <label>
+            Bags (Large)
+            <input
+              name="largeBags"
+              type="number"
+              min="0"
+              max="9"
+              defaultValue={booking?.large_bags || 0}
+            />
+          </label>
+          <label>
+            Bags (Small)
+            <input
+              name="smallBags"
+              type="number"
+              min="0"
+              max="9"
+              defaultValue={booking?.small_bags || 0}
+            />
+          </label>
+          <label>
             Fleet
             <select
               name="fleetTier"
@@ -1401,15 +1567,22 @@ function Calendar({ items }: { items: Booking[] }) {
               </time>
               <div>
                 <small>
-                  {fmtTime(b.pickup_at)} · {b.operator} ·{' '}
-                  {b.booking_type || 'CASH'}
+                  {fmtTime(b.pickup_at)}{' '}
+                  <em className="operator-badge">{b.operator}</em>
                 </small>
-                <h3>{b.passenger_name}</h3>
-                <p>
+                <h3 className="calendar-route">
                   {b.pickup} → {b.dropoff}
+                </h3>
+                <p>
+                  {b.passenger_name} · {b.booking_type || 'CASH'}
                 </p>
               </div>
-              <b>£{b.fare.toFixed(2)}</b>
+              <div className="calendar-fare">
+                <b>£{b.fare.toFixed(2)}</b>
+                <span className={`pill ${b.status}`}>
+                  {b.status.replace('_', ' ')}
+                </span>
+              </div>
             </article>
           ))}
         </div>
@@ -1478,11 +1651,17 @@ function Messages({ items }: { items: Booking[] }) {
     review:
       'Dear {passenger}, thank you for choosing APX RIDE for your journey to {dropoff}.',
   };
-  const [selected, setSelected] = useState(items[0]?.id),
+  const messageJobs = items.filter(
+    (x) =>
+      x.status !== 'complete' &&
+      x.status !== 'archived' &&
+      new Date(x.pickup_at) >= new Date(Date.now() - 86400000),
+  );
+  const [selected, setSelected] = useState(messageJobs[0]?.id),
     [kind, setKind] = useState<keyof typeof defaults>('enroute'),
     [templates, setTemplates] = useState(defaults),
     [draft, setDraft] = useState(defaults.enroute),
-    b = items.find((x) => x.id === selected) || items[0];
+    b = messageJobs.find((x) => x.id === selected) || messageJobs[0];
   useEffect(() => {
     try {
       const t = JSON.parse(
@@ -1524,7 +1703,7 @@ function Messages({ items }: { items: Booking[] }) {
               value={selected}
               onChange={(e) => setSelected(+e.target.value)}
             >
-              {items.map((x) => (
+              {messageJobs.map((x) => (
                 <option value={x.id} key={x.id}>
                   {x.passenger_name} · {x.operator}
                 </option>
@@ -1719,6 +1898,284 @@ function Earnings({ items }: { items: Booking[] }) {
         </>
       )}
     </Page>
+  );
+}
+
+type ExpenseRecord = {
+  id: number;
+  expense_date: string;
+  category: string;
+  amount: number;
+  notes: string;
+};
+function EarningsV2({
+  items,
+  status,
+}: {
+  items: Booking[];
+  status: (
+    id: number,
+    s: string,
+    paymentMethod?: string,
+    accountStatus?: string,
+  ) => void;
+}) {
+  const done = items.filter((b) => b.status === 'complete'),
+    cash = done.filter((b) => (b.booking_type || 'CASH') === 'CASH'),
+    accounts = done.filter((b) => b.booking_type === 'ACCOUNT'),
+    gross = done.reduce((a, b) => a + b.fare, 0),
+    [tab, setTab] = useState<'cash' | 'accounts' | 'expenses'>('cash'),
+    [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
+  const refreshExpenses = () =>
+    fetch('/api/expenses')
+      .then((r) => r.json())
+      .then((d) => Array.isArray(d) && setExpenses(d));
+  useEffect(() => {
+    refreshExpenses();
+  }, []);
+  const expenseTotal = expenses.reduce((a, e) => a + e.amount, 0),
+    cashTotal = cash.reduce((a, b) => a + b.fare, 0),
+    receivable = accounts
+      .filter((b) => b.account_status !== 'settled')
+      .reduce((a, b) => a + b.fare, 0);
+  const add = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(e.currentTarget));
+    await fetch('/api/expenses', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        date: d.date,
+        category: d.category,
+        amount: +d.amount,
+        notes: d.notes,
+      }),
+    });
+    e.currentTarget.reset();
+    refreshExpenses();
+  };
+  const del = async (id: number) => {
+    await fetch('/api/expenses?id=' + id, { method: 'DELETE' });
+    refreshExpenses();
+  };
+  const cats = ['Fuel', 'Servicing', 'Tolls', 'Wash', 'Other'];
+  return (
+    <Page
+      title="Earnings"
+      sub="Revenue, collections, receivables and operating costs in one ledger."
+    >
+      <div className="finance-kpis">
+        <FinanceCard
+          label="Total gross revenue"
+          value={gross}
+          detail={`${done.length} jobs`}
+        />
+        <FinanceCard
+          className="green"
+          label="Cash collected"
+          value={cashTotal}
+          detail={`${cash.length} cash jobs`}
+        />
+        <FinanceCard
+          className="blue"
+          label="Accounts receivable"
+          value={receivable}
+          detail={`${accounts.filter((b) => b.account_status !== 'settled').length} pending invoices`}
+        />
+        <FinanceCard
+          className="red"
+          label="Total expenses"
+          value={expenseTotal}
+          detail={`${expenses.length} entries`}
+        />
+        <FinanceCard
+          className="gold"
+          label="Net operating revenue"
+          value={gross - expenseTotal}
+          detail="Revenue minus expenses"
+        />
+      </div>
+      <div className="view-tabs">
+        <button
+          className={tab === 'cash' ? 'active' : ''}
+          onClick={() => setTab('cash')}
+        >
+          Cash Jobs
+        </button>
+        <button
+          className={tab === 'accounts' ? 'active' : ''}
+          onClick={() => setTab('accounts')}
+        >
+          Account Jobs
+        </button>
+        <button
+          className={tab === 'expenses' ? 'active' : ''}
+          onClick={() => setTab('expenses')}
+        >
+          Expenses
+        </button>
+      </div>
+      {tab === 'cash' && <LedgerTable rows={cash} cash />}
+      {tab === 'accounts' && (
+        <LedgerTable
+          rows={accounts}
+          settle={(id) => status(id, 'complete', undefined, 'settled')}
+        />
+      )}{' '}
+      {tab === 'expenses' && (
+        <>
+          <section className="panel expense-tools">
+            <form onSubmit={add}>
+              <input name="date" type="date" required />
+              <select name="category">
+                {cats.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+              <input
+                name="amount"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Amount £"
+                required
+              />
+              <input name="notes" placeholder="Notes" />
+              <button className="primary">
+                <Plus />
+                Add Expense
+              </button>
+            </form>
+          </section>
+          <div className="expense-categories">
+            {cats.map((c) => (
+              <FinanceCard
+                key={c}
+                label={c}
+                value={expenses
+                  .filter((e) => e.category === c)
+                  .reduce((a, e) => a + e.amount, 0)}
+                detail={`${expenses.filter((e) => e.category === c).length} entries`}
+              />
+            ))}
+          </div>
+          <section className="panel table-wrap">
+            <table className="finance-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Category</th>
+                  <th>Notes</th>
+                  <th>Amount</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {expenses.map((e) => (
+                  <tr key={e.id}>
+                    <td>{fmtDate(e.expense_date)}</td>
+                    <td>{e.category}</td>
+                    <td>{e.notes || '—'}</td>
+                    <td>£{e.amount.toFixed(2)}</td>
+                    <td>
+                      <button onClick={() => del(e.id)}>
+                        <Trash2 />
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={5}>
+                    Total Expenses: £{expenseTotal.toFixed(2)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </section>
+        </>
+      )}
+    </Page>
+  );
+}
+function FinanceCard({
+  label,
+  value,
+  detail,
+  className = '',
+}: {
+  label: string;
+  value: number;
+  detail: string;
+  className?: string;
+}) {
+  return (
+    <article className={`finance-card ${className}`}>
+      <span>{label}</span>
+      <b>£{value.toFixed(2)}</b>
+      <small>{detail}</small>
+    </article>
+  );
+}
+function LedgerTable({
+  rows,
+  cash = false,
+  settle,
+}: {
+  rows: Booking[];
+  cash?: boolean;
+  settle?: (id: number) => void;
+}) {
+  const total = rows.reduce((a, b) => a + b.fare, 0);
+  return (
+    <section className="panel table-wrap">
+      <table className="finance-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Pickup</th>
+            <th>Drop-off</th>
+            <th>Operator</th>
+            <th>Fleet tier</th>
+            {cash ? <th>Payment method</th> : <th>Status</th>}
+            <th>Fare</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((b) => (
+            <tr key={b.id}>
+              <td>{fmtDate(b.pickup_at)}</td>
+              <td>{b.pickup}</td>
+              <td>{b.dropoff}</td>
+              <td>{b.operator}</td>
+              <td>{b.fleet_tier}</td>
+              <td>
+                {cash ? (
+                  b.payment_method || 'CASH'
+                ) : (
+                  <button
+                    className={`account-status ${b.account_status === 'settled' ? 'settled' : ''}`}
+                    onClick={() => settle?.(b.id)}
+                  >
+                    {b.account_status || 'pending'}
+                  </button>
+                )}
+              </td>
+              <td>£{b.fare.toFixed(2)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colSpan={7}>
+              {cash ? 'Cash' : 'Account'} Ledger Total: £{total.toFixed(2)}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </section>
   );
 }
 
