@@ -4,6 +4,100 @@
   margin-top: 20px;
 }
 
+.sidebar-signout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  color: #e8c252;
+  text-decoration: none;
+}
+
+.sidebar-signout svg { width: 16px; }
+.next-job-preview,
+.today-job-list button {
+  display: grid;
+  width: 100%;
+  align-items: center;
+  border: 1px solid #313438;
+  background: #111315;
+  color: #eee;
+  text-align: left;
+}
+.next-job-preview { grid-template-columns: auto 1fr auto; gap: 14px; margin-top: 12px; padding: 10px; border-radius: 10px; }
+.next-job-preview time { display: grid; min-width: 48px; place-items: center; color: #d8aa2d; font-size: .65rem; }
+.next-job-preview time b { font-size: 1.25rem; }
+.next-job-preview div { display: grid; min-width: 0; gap: 3px; }
+.next-job-preview strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.next-job-preview span, .next-job-preview small { color: #919497; font-size: .7rem; }
+.next-job-preview em { color: #d8aa2d; font-size: .65rem; font-style: normal; }
+.today-jobs { margin-top: 18px; }
+.today-job-list { display: grid; gap: 8px; }
+.today-job-list button { grid-template-columns: 90px minmax(0,1fr) auto; gap: 14px; padding: 13px; border-radius: 8px; }
+.today-job-list span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.today-job-list em { color: #d8aa2d; font-style: normal; }
+.completed-filter { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin: 14px 0; }
+.completed-filter label { color: #aaa; font-size: .78rem; }
+.completed-filter input { display: block; margin-top: 5px; }
+.pager { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 14px; color: #aaa; }
+.quick-message textarea { width: 100%; margin-top: 7px; }
+.sms-link, .backup-link { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+.records-tabs { overflow-x: auto; }
+.register-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.register-head > div:last-child, .earnings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.register-head button, .earnings-actions button { display: inline-flex; align-items: center; gap: 7px; }
+.record-search { width: 100%; margin: 18px 0 12px; }
+.compliance-list { display: grid; gap: 9px; }
+.compliance-row { border: 1px solid #303337; border-radius: 10px; background: #111315; }
+.compliance-row summary { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px; cursor: pointer; list-style: none; }
+.compliance-row summary > div { display: flex; align-items: center; gap: 10px; }
+.compliance-row summary > div:first-child { display: grid; gap: 3px; }
+.compliance-row summary span { color: #8f9294; font-size: .72rem; }
+.compliance-row dl { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin: 0; padding: 0 14px 16px; }
+.compliance-row dl div { padding-top: 10px; border-top: 1px solid #292c2f; }
+.compliance-row dt { color: #85898c; font-size: .68rem; text-transform: uppercase; }
+.compliance-row dd { margin: 4px 0 0; color: #eee; overflow-wrap: anywhere; }
+.retention-badge { border: 1px solid #5c5f62; border-radius: 99px; padding: 4px 7px; text-transform: uppercase; }
+.retention-badge.active, .retention-badge.retained { color: #6bcb91 !important; border-color: #376748; }
+.retention-badge.expiring_soon { color: #f0c654 !important; border-color: #80691f; }
+.retention-badge.expired { color: #ef8b8b !important; border-color: #77363b; }
+.empty-register { padding: 28px 12px; text-align: center; color: #888; }
+.record-modal { position: relative; z-index: 2; width: min(900px,calc(100vw - 28px)); max-height: calc(100vh - 40px); overflow: auto; border: 1px solid #3a3d40; border-radius: 14px; background: #17191b; padding: 20px; }
+.record-modal header, .record-modal footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.record-form-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 13px; margin: 18px 0; }
+.record-form-grid label { color: #aaa; font-size: .78rem; }
+.record-form-grid input, .record-form-grid select { width: 100%; margin-top: 6px; }
+.retention-note { color: #9a9d9f; font-size: .76rem; line-height: 1.55; }
+.clock-options, .security-grid { display: grid; gap: 12px; margin: 18px 0; }
+.clock-options { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.clock-options label, .security-grid article { padding: 16px; border: 1px solid #303337; border-radius: 10px; background: #111315; }
+.clock-options small { display: block; margin: 6px 0 0 24px; color: #888; }
+.security-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.security-grid article { display: flex; gap: 12px; }
+.security-grid svg { color: #6bcb91; }
+.security-grid p { margin: 5px 0 0; color: #949799; line-height: 1.5; }
+.financial-charts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+.bar-chart { display: flex; height: 250px; align-items: end; gap: 10px; padding-top: 20px; }
+.bar-chart > div { display: grid; height: 100%; flex: 1; grid-template-rows: 1fr auto auto; align-items: end; gap: 5px; text-align: center; }
+.bar-chart span { display: block; width: 70%; min-height: 4px; margin: auto auto 0; border-radius: 6px 6px 2px 2px; background: #d4af37; }
+.bar-chart b, .bar-chart small { font-size: .66rem; }
+.bar-chart small { color: #888; }
+.donut-layout { display: grid; grid-template-columns: 190px 1fr; align-items: center; gap: 24px; min-height: 250px; }
+.donut { display: grid; width: 180px; aspect-ratio: 1; place-items: center; border-radius: 50%; }
+.donut::before { content: ''; position: absolute; }
+.donut span { display: grid; width: 112px; aspect-ratio: 1; place-content: center; border-radius: 50%; background: #17191b; text-align: center; }
+.donut span b { font-size: 1.4rem; }
+.donut span small { color: #888; }
+.chart-legend p { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; color: #aaa; }
+.chart-legend i { width: 10px; height: 10px; border-radius: 50%; }
+.gold-dot { background: #d4af37; }.red-dot { background: #ef4444; }
+
+@media (max-width: 900px) {
+  .financial-charts, .security-grid, .clock-options, .record-form-grid { grid-template-columns: 1fr; }
+  .compliance-row dl { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .register-head, .compliance-row summary { align-items: flex-start; flex-direction: column; }
+}
+
 .fast-bar > form {
   display: block;
   margin-top: 20px;

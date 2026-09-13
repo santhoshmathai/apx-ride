@@ -30,6 +30,9 @@ export const settings = sqliteTable('settings', {
     .notNull()
     .default(true),
   reviewUrl: text('review_url').notNull().default(''),
+  operatorsJson: text('operators_json').notNull().default('["APX RIDE"]'),
+  ratesJson: text('rates_json').notNull().default('{}'),
+  timeFormat: text('time_format').notNull().default('24'),
   updatedAt: text('updated_at').notNull(),
 });
 export const expenses = sqliteTable('expenses', {
@@ -39,5 +42,29 @@ export const expenses = sqliteTable('expenses', {
   category: text('category').notNull(),
   amount: real('amount').notNull(),
   notes: text('notes').notNull().default(''),
+  createdAt: text('created_at').notNull(),
+});
+
+export const complianceRecords = sqliteTable('compliance_records', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  ownerId: text('owner_id').notNull(),
+  recordType: text('record_type').notNull(),
+  reference: text('reference').notNull(),
+  eventDate: text('event_date').notNull(),
+  status: text('status').notNull(),
+  dataJson: text('data_json').notNull(),
+  retentionUntil: text('retention_until').notNull(),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+export const auditEvents = sqliteTable('audit_events', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  ownerId: text('owner_id').notNull(),
+  actorEmail: text('actor_email').notNull(),
+  action: text('action').notNull(),
+  entityType: text('entity_type').notNull(),
+  entityId: text('entity_id').notNull(),
+  summary: text('summary').notNull(),
   createdAt: text('created_at').notNull(),
 });

@@ -20,5 +20,5 @@ export default async function Home() {
     );
   }
 
-  return <AppShell />;
+  return <AppShell signOutPath={chatGPTSignOutPath('/')} />;
 }

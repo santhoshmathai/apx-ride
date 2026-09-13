@@ -1,16 +1,19 @@
 'use client';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import {
   CalendarDays,
   CarFront,
   Check,
   CircleGauge,
   Copy,
+  Download,
   Eye,
   FileText,
+  FolderLock,
   LayoutDashboard,
+  LogOut,
+  Mail,
   Menu,
-  MessageSquareText,
   Pencil,
   Plus,
   Settings,
@@ -20,6 +23,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { RecordsHub } from './records-hub';
 
 type Booking = {
   id: number;
@@ -58,12 +62,11 @@ const nav = [
   ['Booking Control', CarFront],
   ['Calculator', FileText],
   ['Calendar', CalendarDays],
-  ['Messages', MessageSquareText],
-  ['Earnings', PoundSterling],
+  ['Records', FolderLock],
   ['Settings', Settings],
 ] as const;
 
-export function AppShell() {
+export function AppShell({ signOutPath }: { signOutPath: string }) {
   const [active, setActive] = useState('Dashboard'),
     [mobile, setMobile] = useState(false),
     [modal, setModal] = useState<Booking | null | undefined>(),
@@ -72,7 +75,14 @@ export function AppShell() {
     [loading, setLoading] = useState(true);
   const [operators, setOperators] = useState<string[]>(['APX RIDE']),
     [rates, setRates] = useState<Rates>(defaultRates),
-    [fuelRate, setFuelRate] = useState(50);
+    [fuelRate, setFuelRate] = useState(50),
+    [timeFormat, setTimeFormat] = useState<'12' | '24'>('24');
+  const refresh = () =>
+    fetch('/api/bookings')
+      .then((r) => r.json())
+      .then((d: unknown) => {
+        if (Array.isArray(d)) setBookings(d as Booking[]);
+      });
   useEffect(() => {
     try {
       const s = JSON.parse(localStorage.getItem('apx-settings') || '{}');
@@ -80,21 +90,28 @@ export function AppShell() {
       if (s.rates) setRates(s.rates);
       if (s.fuelRate !== undefined) setFuelRate(s.fuelRate);
     } catch {}
-    refresh().finally(() => setLoading(false));
+    void Promise.all([
+      refresh(),
+      fetch('/api/settings').then((r) => r.json()).then((value: unknown) => {
+        const server = value as Record<string, unknown>;
+        if (server.operators_json) setOperators(JSON.parse(String(server.operators_json)));
+        if (server.rates_json && server.rates_json !== '{}') setRates(JSON.parse(String(server.rates_json)));
+        if (server.fuel_per_100 !== undefined) setFuelRate(Number(server.fuel_per_100));
+        if (server.time_format === '12' || server.time_format === '24') setTimeFormat(server.time_format);
+      }),
+    ]).finally(() => setLoading(false));
   }, []);
-  const persist = (o = operators, r = rates, f = fuelRate) => {
+  const persist = (o = operators, r = rates, f = fuelRate, t = timeFormat) => {
     setOperators(o);
     setRates(r);
     setFuelRate(f);
+    setTimeFormat(t);
     localStorage.setItem(
       'apx-settings',
-      JSON.stringify({ operators: o, rates: r, fuelRate: f }),
+      JSON.stringify({ operators: o, rates: r, fuelRate: f, timeFormat: t }),
     );
+    void fetch('/api/settings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ operators: o, rates: r, fuelRate: f, timeFormat: t }) });
   };
-  const refresh = () =>
-    fetch('/api/bookings')
-      .then((r) => r.json())
-      .then((d: Booking[]) => Array.isArray(d) && setBookings(d));
   const save = async (data: Record<string, unknown>, id?: number) => {
     await fetch('/api/bookings', {
       method: id ? 'PUT' : 'POST',
@@ -135,6 +152,7 @@ export function AppShell() {
         mobile={mobile}
         close={() => setMobile(false)}
         operators={operators.length}
+        signOutPath={signOutPath}
       />
       {mobile && <button className="scrim" onClick={() => setMobile(false)} />}
       <section className="workspace">
@@ -168,10 +186,8 @@ export function AppShell() {
             <Dashboard
               bookings={bookings}
               operators={operators}
-              rates={rates}
-              fuelRate={fuelRate}
-              save={save}
               go={setActive}
+              timeFormat={timeFormat}
             />
           )}
           {active === 'Booking Control' && (
@@ -194,15 +210,15 @@ export function AppShell() {
             />
           )}
           {active === 'Calendar' && <Calendar items={bookings} />}{' '}
-          {active === 'Messages' && <Messages items={bookings} />}{' '}
-          {active === 'Earnings' && (
-            <EarningsV2 items={bookings} status={status} />
+          {active === 'Records' && (
+            <RecordsHub earnings={<EarningsV2 items={bookings} status={status} />} />
           )}
           {active === 'Settings' && (
             <SettingsPage
               operators={operators}
               rates={rates}
               fuelRate={fuelRate}
+              timeFormat={timeFormat}
               persist={persist}
             />
           )}
@@ -236,21 +252,19 @@ function Sidebar({
   mobile,
   close,
   operators,
+  signOutPath,
 }: {
   active: string;
   select: (s: string) => void;
   mobile: boolean;
   close: () => void;
   operators: number;
+  signOutPath: string;
 }) {
   return (
     <aside className={`sidebar ${mobile ? 'open' : ''}`}>
       <div className="brand">
         <img src="/apx-logo.png" alt="APX Ride logo" />
-        <div>
-          <strong>APX RIDE</strong>
-          <small>Executive portal</small>
-        </div>
       </div>
       <button className="close" onClick={close}>
         <X />
@@ -276,6 +290,7 @@ function Sidebar({
         <strong>
           {operators} operator{operators === 1 ? '' : 's'}
         </strong>
+        <a className="sidebar-signout" href={signOutPath}><LogOut />Sign out</a>
       </footer>
     </aside>
   );
@@ -284,17 +299,13 @@ function Sidebar({
 function Dashboard({
   bookings,
   operators,
-  rates,
-  fuelRate,
-  save,
   go,
+  timeFormat,
 }: {
   bookings: Booking[];
   operators: string[];
-  rates: Rates;
-  fuelRate: number;
-  save: (d: Record<string, unknown>) => void;
   go: (s: string) => void;
+  timeFormat: '12' | '24';
 }) {
   const upcoming = bookings
       .filter((b) => b.status === 'upcoming')
@@ -313,9 +324,9 @@ function Dashboard({
               <p>Bookings, dispatch and quotes in one live workspace.</p>
             </div>
           </section>
-          <Dispatch next={next} go={go} />
+          <Dispatch next={next} following={upcoming[1]} go={go} />
         </div>
-        <LiveClock go={() => go('Calendar')} />
+        <LiveClock go={() => go('Calendar')} timeFormat={timeFormat} />
       </div>
       <div className="stats">
         <Stat
@@ -337,11 +348,11 @@ function Dashboard({
           detail={`${operators.length} booking sources`}
         />
       </div>
-      <FastBooking operators={operators} save={save} />
+      <TodayJobs jobs={upcoming.filter((booking) => booking.pickup_at.slice(0, 10) === new Date().toISOString().slice(0, 10))} go={go} />
     </>
   );
 }
-function LiveClock({ go }: { go: () => void }) {
+function LiveClock({ go, timeFormat }: { go: () => void; timeFormat: '12' | '24' }) {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -354,7 +365,7 @@ function LiveClock({ go }: { go: () => void }) {
         {now.toLocaleTimeString('en-GB', {
           hour: '2-digit',
           minute: '2-digit',
-          hour12: true,
+          hour12: timeFormat === '12',
         })}
       </b>
       <span>
@@ -369,7 +380,7 @@ function LiveClock({ go }: { go: () => void }) {
     </section>
   );
 }
-function Dispatch({ next, go }: { next?: Booking; go: (s: string) => void }) {
+function Dispatch({ next, following, go }: { next?: Booking; following?: Booking; go: (s: string) => void }) {
   return (
     <section className="panel dispatch">
       <Head over="LIVE DISPATCH" title="Next journey" />
@@ -407,12 +418,23 @@ function Dispatch({ next, go }: { next?: Booking; go: (s: string) => void }) {
               Manage dispatch →
             </button>
           </div>
+          {following && (
+            <button className="next-job-preview" onClick={() => go('Booking Control')}>
+              <time><b>{new Date(following.pickup_at).getDate()}</b>{new Date(following.pickup_at).toLocaleDateString('en-GB', { month: 'short' }).toUpperCase()}</time>
+              <div><small>NEXT UPCOMING JOB · {fmtTime(following.pickup_at)} · {following.operator}</small><strong>{following.pickup} → {following.dropoff}</strong><span>{following.passenger_name} · {following.booking_type || 'CASH'}</span></div>
+              <em>UPCOMING</em>
+            </button>
+          )}
         </>
       ) : (
         <Empty text="No upcoming dispatches." />
       )}
     </section>
   );
+}
+
+function TodayJobs({ jobs, go }: { jobs: Booking[]; go: (page: string) => void }) {
+  return <section className="panel today-jobs"><Head over="TODAY" title="Upcoming jobs today" />{jobs.length ? <div className="today-job-list">{jobs.map((job) => <button key={job.id} onClick={() => go('Booking Control')}><b>{fmtTime(job.pickup_at)}</b><span>{job.pickup} → {job.dropoff}</span><em>{job.operator}</em></button>)}</div> : <Empty text="No Upcoming Jobs Today" />}</section>;
 }
 function QuickQuote({
   rates,
@@ -575,14 +597,19 @@ function Bookings({
   add: () => void;
 }) {
   const [tab, setTab] = useState<'active' | 'progress' | 'complete'>('active');
-  const [finishing, setFinishing] = useState<Booking | null>(null);
-  const shown = items.filter((b) =>
+  const [finishing, setFinishing] = useState<Booking | null>(null),
+    [messaging, setMessaging] = useState<Booking | null>(null),
+    [from, setFrom] = useState(''),
+    [to, setTo] = useState(''),
+    [page, setPage] = useState(1);
+  const filtered = items.filter((b) =>
     tab === 'complete'
       ? b.status === 'complete'
       : tab === 'progress'
         ? b.status === 'in_progress'
         : b.status === 'upcoming',
-  );
+  ).filter((b) => tab !== 'complete' || ((!from || b.pickup_at.slice(0, 10) >= from) && (!to || b.pickup_at.slice(0, 10) <= to)));
+  const shown = tab === 'complete' ? filtered.slice((page - 1) * 10, page * 10) : filtered;
   return (
     <Page
       title="Booking control"
@@ -615,6 +642,7 @@ function Bookings({
           Completed jobs ({items.filter((b) => b.status === 'complete').length})
         </button>
       </div>
+      {tab === 'complete' && <div className="completed-filter"><label>From date<input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} /></label><label>To date<input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} /></label><button onClick={() => { setFrom(''); setTo(''); setPage(1); }}>Reset</button></div>}
       {loading && <p>Loading…</p>}
       <div className="records">
         {shown.map((b) => (
@@ -638,9 +666,7 @@ function Bookings({
               <button onClick={() => view(b)} title="View details">
                 <Eye />
               </button>
-              <button onClick={() => edit(b)} title="Edit booking">
-                <Pencil />
-              </button>
+              {b.status !== 'complete' && <button onClick={() => edit(b)} title="Edit booking"><Pencil /></button>}
               {b.status === 'upcoming' && (
                 <button
                   onClick={() => done(b.id, 'in_progress')}
@@ -655,13 +681,13 @@ function Bookings({
                   Finish
                 </button>
               )}
-              <button onClick={() => remove(b.id)} title="Remove">
-                <Trash2 />
-              </button>
+              {b.status !== 'complete' && <button onClick={() => setMessaging(b)} title="Message passenger"><Mail /></button>}
+              {b.status !== 'complete' && <button onClick={() => remove(b.id)} title="Remove"><Trash2 /></button>}
             </div>
           </article>
         ))}
       </div>
+      {tab === 'complete' && filtered.length > 10 && <div className="pager"><button disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</button><span>Showing {(page - 1) * 10 + 1}–{Math.min(page * 10, filtered.length)} of {filtered.length}</span><button disabled={page * 10 >= filtered.length} onClick={() => setPage(page + 1)}>Next</button></div>}
       {finishing && (
         <PaymentModal
           booking={finishing}
@@ -673,8 +699,19 @@ function Bookings({
           }}
         />
       )}
+      {messaging && <QuickMessage booking={messaging} close={() => setMessaging(null)} />}
     </Page>
   );
+}
+
+function QuickMessage({ booking, close }: { booking: Booking; close: () => void }) {
+  const templates = {
+    'Vehicle En Route': `Hello ${booking.passenger_name}, your APX RIDE vehicle is en route to ${booking.pickup} for your journey to ${booking.dropoff}.`,
+    'Driver Arrived': `Hello ${booking.passenger_name}, your APX RIDE driver has arrived at ${booking.pickup}.`,
+    'Journey Complete': `Thank you ${booking.passenger_name}. Your APX RIDE journey to ${booking.dropoff} is complete.`,
+  };
+  const [message, setMessage] = useState(templates['Vehicle En Route']);
+  return <div className="modal"><button className="scrim" onClick={close} /><section className="payment-card quick-message"><header><div><small>PASSENGER MESSAGE</small><h2>{booking.passenger_name}</h2></div><button onClick={close}><X /></button></header><label>Template<select onChange={(e) => setMessage(templates[e.target.value as keyof typeof templates])}>{Object.keys(templates).map((name) => <option key={name}>{name}</option>)}</select></label><label>Message<textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={5} /></label><footer><button onClick={() => navigator.clipboard.writeText(message)}><Copy />Copy</button><a className="primary sms-link" href={`sms:${booking.phone}?body=${encodeURIComponent(message)}`}>Open SMS</a></footer></section></div>;
 }
 
 function PaymentModal({
@@ -1026,36 +1063,23 @@ function SettingsPage({
   operators,
   rates,
   fuelRate,
+  timeFormat,
   persist,
 }: {
   operators: string[];
   rates: Rates;
   fuelRate: number;
-  persist: (o: string[], r: Rates, f: number) => void;
+  timeFormat: '12' | '24';
+  persist: (o: string[], r: Rates, f: number, t?: '12' | '24') => void;
 }) {
   const [tab, setTab] = useState<
-      'drivers' | 'vehicles' | 'templates' | 'operators' | 'rates'
-    >('drivers'),
+      'templates' | 'operators' | 'rates' | 'clock' | 'security'
+    >('templates'),
     [ops, setOps] = useState(operators),
     [draft, setDraft] = useState(''),
     [localRates, setLocalRates] = useState(rates),
     [fuel, setFuel] = useState(fuelRate),
-    [drivers, setDrivers] = useState<string[]>(() =>
-      JSON.parse(localStorage.getItem('apx-drivers') || '[]'),
-    ),
-    [vehicles, setVehicles] = useState<string[]>(() =>
-      JSON.parse(localStorage.getItem('apx-vehicles') || '[]'),
-    ),
-    [entry, setEntry] = useState('');
-  const storeList = (
-    key: string,
-    value: string[],
-    setter: (v: string[]) => void,
-  ) => {
-    setter(value);
-    localStorage.setItem(key, JSON.stringify(value));
-    setEntry('');
-  };
+    [clock, setClock] = useState<'12' | '24'>(timeFormat);
   const addOp = () => {
     const n = draft.trim();
     if (n && !ops.some((o) => o.toLowerCase() === n.toLowerCase())) {
@@ -1069,18 +1093,6 @@ function SettingsPage({
       sub="Profiles, templates, operators and rates are organised in separate tabs."
     >
       <div className="view-tabs settings-tabs">
-        <button
-          className={tab === 'drivers' ? 'active' : ''}
-          onClick={() => setTab('drivers')}
-        >
-          Drivers
-        </button>
-        <button
-          className={tab === 'vehicles' ? 'active' : ''}
-          onClick={() => setTab('vehicles')}
-        >
-          Vehicles
-        </button>
         <button
           className={tab === 'templates' ? 'active' : ''}
           onClick={() => setTab('templates')}
@@ -1099,34 +1111,15 @@ function SettingsPage({
         >
           Default rates
         </button>
+        <button className={tab === 'clock' ? 'active' : ''} onClick={() => setTab('clock')}>Clock settings</button>
+        <button className={tab === 'security' ? 'active' : ''} onClick={() => setTab('security')}>Security & backup</button>
       </div>
-      {tab === 'drivers' && (
-        <ProfileList
-          title="Driver profiles"
-          hint="Driver name · phone · badge/licence"
-          items={drivers}
-          entry={entry}
-          setEntry={setEntry}
-          save={(v) => storeList('apx-drivers', v, setDrivers)}
-        />
-      )}{' '}
-      {tab === 'vehicles' && (
-        <ProfileList
-          title="Vehicle profiles"
-          hint="Make/model · registration · colour"
-          items={vehicles}
-          entry={entry}
-          setEntry={setEntry}
-          save={(v) => storeList('apx-vehicles', v, setVehicles)}
-        />
-      )}{' '}
       {tab === 'templates' && (
         <section className="panel">
           <Head over="NOTIFICATIONS" title="Message templates" />
           <p className="note">
-            Templates are created and edited in Messages. Saved templates
-            automatically remain available for future bookings and can use
-            passenger, pickup, drop-off, driver and vehicle placeholders.
+            Standard passenger notifications are available from each active or
+            en-route booking. They bind the passenger and route automatically.
           </p>
         </section>
       )}{' '}
@@ -1161,7 +1154,7 @@ function SettingsPage({
           </div>
           <button
             className="primary settings-save"
-            onClick={() => persist(ops, localRates, fuel)}
+            onClick={() => persist(ops, localRates, fuel, clock)}
           >
             <Save />
             Save operators
@@ -1217,13 +1210,15 @@ function SettingsPage({
           </label>
           <button
             className="primary settings-save"
-            onClick={() => persist(ops, localRates, fuel)}
+            onClick={() => persist(ops, localRates, fuel, clock)}
           >
             <Save />
             Save default rates
           </button>
         </section>
       )}
+      {tab === 'clock' && <section className="panel"><Head over="DISPLAY PREFERENCE" title="Clock & time display" /><p className="note">Choose the time format used by the live operations clock.</p><div className="clock-options"><label><input type="radio" name="clock" checked={clock === '12'} onChange={() => setClock('12')} />12-hour clock <small>03:00 PM</small></label><label><input type="radio" name="clock" checked={clock === '24'} onChange={() => setClock('24')} />24-hour clock <small>15:00</small></label></div><button className="primary settings-save" onClick={() => persist(ops, localRates, fuel, clock)}><Save />Save preference</button></section>}
+      {tab === 'security' && <section className="panel security-panel"><Head over="DATA PROTECTION" title="Security & backup" /><div className="security-grid"><article><Check /><div><b>Individual authenticated access</b><p>Every user signs in with their own approved ChatGPT account. Shared PINs are not used.</p></div></article><article><Check /><div><b>Server-side authorisation</b><p>Booking, expense and compliance APIs verify identity and the approved email list.</p></div></article><article><Check /><div><b>Durable records and audit trail</b><p>Operational data is stored in the hosted database; compliance edits create audit entries.</p></div></article><article><Check /><div><b>12-month compliance retention</b><p>Lost property and complaint records show their minimum retention date and cannot be deleted in the portal.</p></div></article></div><a className="primary backup-link" href="/api/backup"><Download />Download full data backup</a><p className="retention-note">Store downloaded backups in an encrypted, access-controlled location. Test restoration and document who is responsible for the backup schedule.</p></section>}
     </Page>
   );
 }
@@ -1518,7 +1513,7 @@ function Calendar({ items }: { items: Booking[] }) {
     }),
     [day, setDay] = useState('');
   const jobs = items
-    .filter((b) => b.status !== 'archived')
+    .filter((b) => b.status !== 'archived' && b.status !== 'complete')
     .sort((a, b) => a.pickup_at.localeCompare(b.pickup_at));
   const unavailable = (d: string) => days.includes(d);
   const addDay = () => {
@@ -1942,11 +1937,12 @@ function EarningsV2({
     accountStatus?: string,
   ) => void;
 }) {
-  const done = items.filter((b) => b.status === 'complete'),
+  const [source, setSource] = useState('ALL');
+  const done = items.filter((b) => b.status === 'complete' && (source === 'ALL' || b.operator === source)),
     cash = done.filter((b) => (b.booking_type || 'CASH') === 'CASH'),
     accounts = done.filter((b) => b.booking_type === 'ACCOUNT'),
     gross = done.reduce((a, b) => a + b.fare, 0),
-    [tab, setTab] = useState<'cash' | 'accounts' | 'expenses'>('cash'),
+    [tab, setTab] = useState<'charts' | 'cash' | 'accounts' | 'expenses'>('charts'),
     [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const refreshExpenses = () =>
     fetch('/api/expenses')
@@ -1983,8 +1979,9 @@ function EarningsV2({
   const cats = ['Fuel', 'Servicing', 'Tolls', 'Wash', 'Other'];
   return (
     <Page
-      title="Earnings"
+      title={`Earnings Analytics${source === 'ALL' ? '' : ` — ${source}`}`}
       sub="Revenue, collections, receivables and operating costs in one ledger."
+      action={<div className="earnings-actions"><select value={source} onChange={(e) => setSource(e.target.value)}><option value="ALL">All operators</option>{Array.from(new Set(items.map((item) => item.operator))).map((name) => <option key={name}>{name}</option>)}</select><button onClick={() => window.print()}><Printer />Generate statement</button></div>}
     >
       <div className="finance-kpis">
         <FinanceCard
@@ -2018,6 +2015,7 @@ function EarningsV2({
         />
       </div>
       <div className="view-tabs">
+        <button className={tab === 'charts' ? 'active' : ''} onClick={() => setTab('charts')}>Charts</button>
         <button
           className={tab === 'cash' ? 'active' : ''}
           onClick={() => setTab('cash')}
@@ -2037,6 +2035,7 @@ function EarningsV2({
           Expenses
         </button>
       </div>
+      {tab === 'charts' && <FinancialCharts rows={done} expenses={expenses} />}
       {tab === 'cash' && <LedgerTable rows={cash} cash />}
       {tab === 'accounts' && (
         <LedgerTable
@@ -2121,6 +2120,14 @@ function EarningsV2({
       )}
     </Page>
   );
+}
+
+function FinancialCharts({ rows, expenses }: { rows: Booking[]; expenses: ExpenseRecord[] }) {
+  const monday = new Date(); monday.setHours(0, 0, 0, 0); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  const daily = Array.from({ length: 7 }, (_, index) => { const date = new Date(monday); date.setDate(monday.getDate() + index); const key = date.toISOString().slice(0, 10); return rows.filter((row) => row.pickup_at.slice(0, 10) === key).reduce((sum, row) => sum + row.fare, 0); });
+  const max = Math.max(...daily, 1), gross = rows.reduce((sum, row) => sum + row.fare, 0), expense = expenses.reduce((sum, row) => sum + row.amount, 0), net = gross - expense;
+  const expensePercent = gross > 0 ? Math.min(100, Math.max(0, (expense / gross) * 100)) : 0;
+  return <div className="financial-charts"><section className="panel"><Head over="CURRENT WEEK" title="Weekly revenue overview" /><div className="bar-chart">{daily.map((value, index) => <div key={index}><span title={`£${value.toFixed(2)}`} style={{ height: `${Math.max(4, value / max * 100)}%` }} /><b>{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][index]}</b><small>£{value.toFixed(0)}</small></div>)}</div></section><section className="panel"><Head over="REVENUE MIX" title="Financial breakdown" /><div className="donut-layout"><div className="donut" style={{ background: `conic-gradient(#ef4444 0 ${expensePercent}%, #d4af37 ${expensePercent}% 100%)` }}><span><b>£{gross.toFixed(0)}</b><small>Gross</small></span></div><div className="chart-legend"><p><i className="gold-dot" />Net operating revenue <b>£{net.toFixed(2)}</b></p><p><i className="red-dot" />Total expenses <b>£{expense.toFixed(2)}</b></p></div></div></section></div>;
 }
 function FinanceCard({
   label,
