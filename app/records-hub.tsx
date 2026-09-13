@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { Download, FileDown, Plus, Save, X } from 'lucide-react';
 
 type RecordRow = {
@@ -15,10 +15,10 @@ type RecordRow = {
   updated_at: string;
 };
 
-type Field = { name: string; label: string; type?: string; required?: boolean };
+type Field = { name: string; label: string; type?: string; required?: boolean; options?: string[] };
 const schemas: Record<string, { label: string; singular: string; fields: Field[]; statuses: string[] }> = {
-  driver: {
-    label: 'Drivers', singular: 'Driver', statuses: ['ACTIVE', 'INACTIVE', 'SUSPENDED'],
+  roster: {
+    label: 'Driver & Vehicle Roster', singular: 'Driver & Vehicle', statuses: ['ACTIVE', 'INACTIVE', 'SUSPENDED'],
     fields: [
       { name: 'callSign', label: 'Call sign / Driver ID', required: true },
       { name: 'fullName', label: 'Full name', required: true },
@@ -30,11 +30,6 @@ const schemas: Record<string, { label: string; singular: string; fields: Field[]
       { name: 'address', label: 'Current address', required: true },
       { name: 'engagementDate', label: 'Engagement start date', type: 'date' },
       { name: 'licenceDocument', label: 'Licence document reference / secure link' },
-    ],
-  },
-  vehicle: {
-    label: 'Vehicles', singular: 'Vehicle', statuses: ['ACTIVE', 'MAINTENANCE', 'INACTIVE'],
-    fields: [
       { name: 'vrm', label: 'Vehicle registration', required: true },
       { name: 'makeModelColour', label: 'Make, model and colour', required: true },
       { name: 'fleetTier', label: 'Fleet tier', required: true },
@@ -70,7 +65,7 @@ const schemas: Record<string, { label: string; singular: string; fields: Field[]
       { name: 'bookingRef', label: 'Associated booking ID' },
       { name: 'driver', label: 'Driver name', required: true },
       { name: 'driverLicence', label: 'Driver licence number', required: true },
-      { name: 'category', label: 'Category', required: true },
+      { name: 'category', label: 'Category', required: true, options: ['Driver Conduct', 'Fare Dispute', 'Vehicle Condition', 'Punctuality / Delay', 'Other'] },
       { name: 'incident', label: 'Nature and details of complaint', required: true },
       { name: 'actionTaken', label: 'Investigation / action taken', required: true },
     ],
@@ -80,26 +75,25 @@ const schemas: Record<string, { label: string; singular: string; fields: Field[]
     fields: [
       { name: 'driverVehicle', label: 'Driver / vehicle reference', required: true },
       { name: 'incidentTime', label: 'Incident time', type: 'time', required: true },
-      { name: 'category', label: 'Disclosure category', required: true },
+      { name: 'category', label: 'Disclosure category', required: true, options: ['Driving Endorsements / Convictions / Cautions', 'Arrests', 'Change of Address', 'Vehicle Accidents', 'Other Mandatory Council Disclosure'] },
       { name: 'summary', label: 'Incident summary', required: true },
-      { name: 'proofReference', label: 'Document / proof reference or secure link' },
+      { name: 'proofFile', label: 'Document / proof upload', type: 'file' },
       { name: 'councilReference', label: 'Council reference' },
     ],
   },
 };
 
-export function RecordsHub({ earnings }: { earnings: ReactNode }) {
-  const [tab, setTab] = useState('earnings');
+export function RecordsHub() {
+  const [tab, setTab] = useState('roster');
   return (
     <>
       <section className="page-head">
         <div><h2>Records Hub</h2><p>Operational registers, financial records and council-ready audit exports.</p></div>
       </section>
       <div className="view-tabs records-tabs">
-        <button className={tab === 'earnings' ? 'active' : ''} onClick={() => setTab('earnings')}>Earnings</button>
         {Object.entries(schemas).map(([key, schema]) => <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{schema.label}</button>)}
       </div>
-      {tab === 'earnings' ? earnings : <Register type={tab} />}
+      <Register type={tab} />
     </>
   );
 }
@@ -141,17 +135,20 @@ function Register({ type }: { type: string }) {
 function RecordModal({ schema, type, row, close, saved }: { schema: (typeof schemas)[string]; type: string; row: RecordRow | null; close: () => void; saved: () => void }) {
   const data = row ? JSON.parse(row.data_json || '{}') : {};
   const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); const form = Object.fromEntries(new FormData(event.currentTarget));
-    const payload = { id: row?.id, recordType: type, reference: form.reference, eventDate: form.eventDate, status: form.status, data: Object.fromEntries(schema.fields.map((field) => [field.name, form[field.name]])) };
+    event.preventDefault(); const raw = new FormData(event.currentTarget); const form = Object.fromEntries(raw);
+    const payload = { id: row?.id, recordType: type, reference: form.reference, eventDate: form.eventDate, status: form.status, data: Object.fromEntries(schema.fields.filter((field) => field.type !== 'file').map((field) => [field.name, form[field.name]])) };
     const response = await fetch('/api/records', { method: row ? 'PUT' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
-    if (response.ok) saved(); else alert('The record could not be saved. Please try again.');
+    if (!response.ok) { alert('The record could not be saved. Please try again.'); return; }
+    const result = await response.json() as { id?: number | string };
+    const proof = raw.get('proofFile');
+    if (proof instanceof File && proof.size && (result.id || row?.id)) { const upload = new FormData(); upload.set('file', proof); upload.set('recordId', String(result.id || row?.id)); upload.set('fieldName', 'proofFile'); const uploaded = await fetch('/api/documents', { method: 'POST', body: upload }); if (!uploaded.ok) { alert('The record was saved, but the document upload failed.'); } }
+    saved();
   };
-  return <div className="modal"><button className="scrim" aria-label="Close record form" onClick={close} /><form className="record-modal" onSubmit={submit}><header><div><small>COMPLIANCE RECORD</small><h2>{row ? 'Edit' : 'Add'} {schema.singular}</h2></div><button type="button" aria-label="Close record form" onClick={close}><X /></button></header><div className="record-form-grid"><label>Reference<input name="reference" defaultValue={row?.reference || ''} placeholder="Generated if left blank" /></label><label>Record date<input name="eventDate" type="date" required defaultValue={row?.event_date || new Date().toISOString().slice(0, 10)} /></label><label>Status<select name="status" defaultValue={row?.status || schema.statuses[0]}>{schema.statuses.map((status) => <option key={status}>{status}</option>)}</select></label>{schema.fields.map((field) => <label key={field.name}>{field.label}<input name={field.name} type={field.type || 'text'} required={field.required} defaultValue={data[field.name] || ''} /></label>)}</div><p className="retention-note">This record is retained for at least 12 months. Changes are written to the audit trail; deletion is disabled.</p><footer><button type="button" onClick={close}>Cancel</button><button className="primary"><Save />Save record</button></footer></form></div>;
+  return <div className="modal"><button className="scrim" aria-label="Close record form" onClick={close} /><form className="record-modal" onSubmit={submit}><header><div><small>COMPLIANCE RECORD</small><h2>{row ? 'Edit' : 'Add'} {schema.singular}</h2></div><button type="button" aria-label="Close record form" onClick={close}><X /></button></header><div className="record-form-grid"><label>Reference<input name="reference" defaultValue={row?.reference || ''} placeholder="Generated if left blank" /></label><label>Record date<input name="eventDate" type="date" required defaultValue={row?.event_date || new Date().toISOString().slice(0, 10)} /></label><label>Status<select name="status" defaultValue={row?.status || schema.statuses[0]}>{schema.statuses.map((status) => <option key={status}>{status}</option>)}</select></label>{schema.fields.map((field) => <label key={field.name}>{field.label}{field.options ? <select name={field.name} required={field.required} defaultValue={data[field.name] || field.options[0]}>{field.options.map((option) => <option key={option}>{option}</option>)}</select> : <input name={field.name} type={field.type || 'text'} accept={field.type === 'file' ? '.pdf,.jpg,.jpeg,.png' : undefined} required={field.required} defaultValue={field.type === 'file' ? undefined : data[field.name] || ''} />}</label>)}</div><p className="retention-note">This record is retained for at least 12 months. Every change creates a preserved revision; deletion is disabled.</p><footer><button type="button" onClick={close}>Cancel</button><button className="primary"><Save />Save revision</button></footer></form></div>;
 }
 
 function primaryValue(type: string, data: Record<string, string>, fallback: string) {
-  if (type === 'driver') return `${data.callSign || ''} ${data.fullName || fallback}`.trim();
-  if (type === 'vehicle') return `${data.vrm || ''} ${data.makeModelColour || fallback}`.trim();
+  if (type === 'roster') return `${data.callSign || ''} ${data.fullName || fallback} · ${data.vrm || 'No vehicle'}`.trim();
   if (type === 'lost_property') return data.item || fallback;
   if (type === 'complaint') return data.complainant || fallback;
   return data.driverVehicle || fallback;

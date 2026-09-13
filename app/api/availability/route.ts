@@ -1,0 +1,8 @@
+import { env } from 'cloudflare:workers';
+import { NextResponse } from 'next/server';
+import { getChatGPTUser, isApprovedEmail } from '../../chatgpt-auth';
+
+async function authorised() { const user = await getChatGPTUser(); return user && isApprovedEmail(user.email) ? user : null; }
+export async function GET() { const user = await authorised(); if (!user) return NextResponse.json({ error: 'Access denied' }, { status: 403 }); const result = await env.DB.prepare('SELECT * FROM unavailable_periods WHERE owner_id=? ORDER BY unavailable_date').bind(user.userId).all(); return NextResponse.json(result.results); }
+export async function POST(req: Request) { const user = await authorised(); if (!user) return NextResponse.json({ error: 'Access denied' }, { status: 403 }); const body = await req.json() as { date: string; fullDay: boolean; startTime?: string; endTime?: string; reason: string }; const result = await env.DB.prepare('INSERT INTO unavailable_periods(owner_id,unavailable_date,full_day,start_time,end_time,reason,created_at) VALUES(?,?,?,?,?,?,?)').bind(user.userId, body.date, body.fullDay ? 1 : 0, body.fullDay ? '' : body.startTime || '', body.fullDay ? '' : body.endTime || '', body.reason, new Date().toISOString()).run(); return NextResponse.json({ id: result.meta.last_row_id }, { status: 201 }); }
+export async function DELETE(req: Request) { const user = await authorised(); if (!user) return NextResponse.json({ error: 'Access denied' }, { status: 403 }); const id = Number(new URL(req.url).searchParams.get('id')); await env.DB.prepare('DELETE FROM unavailable_periods WHERE id=? AND owner_id=?').bind(id, user.userId).run(); return NextResponse.json({ ok: true }); }

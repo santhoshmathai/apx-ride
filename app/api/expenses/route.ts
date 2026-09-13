@@ -36,15 +36,17 @@ export async function POST(req: Request) {
     date: string;
     category: string;
     amount: number;
+    driverCallSign?: string;
     notes?: string;
   };
   const result = await env.DB.prepare(
-    'INSERT INTO expenses(owner_id,expense_date,category,amount,notes,created_at) VALUES(?,?,?,?,?,?)',
+    'INSERT INTO expenses(owner_id,expense_date,category,driver_call_sign,amount,notes,created_at) VALUES(?,?,?,?,?,?,?)',
   )
     .bind(
       auth.id,
       body.date,
       body.category,
+      body.driverCallSign || '',
       body.amount,
       body.notes || '',
       new Date().toISOString(),

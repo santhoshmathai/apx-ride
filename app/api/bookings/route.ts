@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     const b = (await req.json()) as Record<string, unknown>;
     const now = new Date().toISOString();
     const result = await env.DB.prepare(
-      `INSERT INTO bookings(owner_id,passenger_name,phone,pickup,dropoff,pickup_at,operator,booking_type,passengers,large_bags,small_bags,fleet_tier,distance,fare,status,notes,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO bookings(owner_id,passenger_name,phone,pickup,dropoff,pickup_at,operator,driver_call_sign,driver_name,driver_licence,booking_type,passengers,large_bags,small_bags,fleet_tier,distance,fare,status,notes,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     )
       .bind(
         ownerId,
@@ -58,6 +58,9 @@ export async function POST(req: Request) {
         b.dropoff || '',
         b.pickupAt || now,
         b.operator || 'APX RIDE',
+        b.driverCallSign || '',
+        b.driverName || '',
+        b.driverLicence || '',
         b.bookingType || 'CASH',
         b.passengers || 1,
         b.largeBags || 0,
@@ -111,7 +114,7 @@ export async function PUT(req: Request) {
     await ready();
     const b = (await req.json()) as Record<string, unknown>;
     await env.DB.prepare(
-      `UPDATE bookings SET passenger_name=?,phone=?,pickup=?,dropoff=?,pickup_at=?,operator=?,booking_type=?,passengers=?,large_bags=?,small_bags=?,fleet_tier=?,distance=?,fare=?,notes=?,updated_at=? WHERE id=? AND owner_id=?`,
+      `UPDATE bookings SET passenger_name=?,phone=?,pickup=?,dropoff=?,pickup_at=?,operator=?,driver_call_sign=?,driver_name=?,driver_licence=?,booking_type=?,passengers=?,large_bags=?,small_bags=?,fleet_tier=?,distance=?,fare=?,notes=?,updated_at=? WHERE id=? AND owner_id=?`,
     )
       .bind(
         b.passengerName || 'Unnamed passenger',
@@ -120,6 +123,9 @@ export async function PUT(req: Request) {
         b.dropoff || '',
         b.pickupAt || new Date().toISOString(),
         b.operator || 'APX RIDE',
+        b.driverCallSign || '',
+        b.driverName || '',
+        b.driverLicence || '',
         b.bookingType || 'CASH',
         b.passengers || 1,
         b.largeBags || 0,

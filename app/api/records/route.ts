@@ -35,6 +35,9 @@ export async function POST(req: Request) {
   const result = await env.DB.prepare('INSERT INTO compliance_records(owner_id,record_type,reference,event_date,status,data_json,retention_until,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)')
     .bind(user.userId, type, reference, eventDate, String(body.status || 'ACTIVE'), JSON.stringify(body.data || {}), retentionDate(eventDate), now, now).run();
   const id = String(result.meta.last_row_id);
+  const snapshot = JSON.stringify({ reference, eventDate, status: String(body.status || 'ACTIVE'), data: body.data || {}, retentionUntil: retentionDate(eventDate) });
+  await env.DB.prepare('INSERT INTO record_revisions(owner_id,record_id,revision_number,snapshot_json,actor_email,created_at) VALUES(?,?,?,?,?,?)')
+    .bind(user.userId, Number(id), 1, snapshot, user.email, now).run();
   await env.DB.prepare('INSERT INTO audit_events(owner_id,actor_email,action,entity_type,entity_id,summary,created_at) VALUES(?,?,?,?,?,?,?)')
     .bind(user.userId, user.email, 'CREATE', type, id, `Created ${reference}`, now).run();
   return NextResponse.json({ id, reference }, { status: 201 });
@@ -48,6 +51,10 @@ export async function PUT(req: Request) {
   if (!existing) return NextResponse.json({ error: 'Record not found' }, { status: 404 });
   const eventDate = String(body.eventDate || existing.event_date);
   const now = new Date().toISOString();
+  const revision = await env.DB.prepare('SELECT COALESCE(MAX(revision_number),0)+1 AS next_revision FROM record_revisions WHERE owner_id=? AND record_id=?').bind(user.userId, Number(body.id)).first<{ next_revision: number }>();
+  const nextSnapshot = JSON.stringify({ reference: String(body.reference || existing.reference), eventDate, status: String(body.status || existing.status), data: body.data || {}, retentionUntil: retentionDate(eventDate) });
+  await env.DB.prepare('INSERT INTO record_revisions(owner_id,record_id,revision_number,snapshot_json,actor_email,created_at) VALUES(?,?,?,?,?,?)')
+    .bind(user.userId, Number(body.id), revision?.next_revision || 1, nextSnapshot, user.email, now).run();
   await env.DB.prepare('UPDATE compliance_records SET reference=?,event_date=?,status=?,data_json=?,retention_until=?,updated_at=? WHERE id=? AND owner_id=?')
     .bind(String(body.reference || existing.reference), eventDate, String(body.status || existing.status), JSON.stringify(body.data || {}), retentionDate(eventDate), now, Number(body.id), user.userId).run();
   await env.DB.prepare('INSERT INTO audit_events(owner_id,actor_email,action,entity_type,entity_id,summary,created_at) VALUES(?,?,?,?,?,?,?)')

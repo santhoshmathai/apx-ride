@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   LogOut,
   Mail,
+  MessageSquareText,
   Menu,
   Pencil,
   Plus,
@@ -44,6 +45,9 @@ type Booking = {
   fare: number;
   status: string;
   notes: string;
+  driver_call_sign?: string;
+  driver_name?: string;
+  driver_licence?: string;
 };
 type Rate = { base: number; rate: number };
 type Rates = Record<'Saloon' | 'Estate' | '6-seater' | '7-seater', Rate>;
@@ -62,9 +66,12 @@ const nav = [
   ['Booking Control', CarFront],
   ['Calculator', FileText],
   ['Calendar', CalendarDays],
-  ['Records', FolderLock],
+  ['Messages', MessageSquareText],
+  ['Records Hub', FolderLock],
+  ['Earnings', PoundSterling],
   ['Settings', Settings],
 ] as const;
+let activeTimeFormat: '12' | '24' = '24';
 
 export function AppShell({ signOutPath }: { signOutPath: string }) {
   const [active, setActive] = useState('Dashboard'),
@@ -77,6 +84,7 @@ export function AppShell({ signOutPath }: { signOutPath: string }) {
     [rates, setRates] = useState<Rates>(defaultRates),
     [fuelRate, setFuelRate] = useState(50),
     [timeFormat, setTimeFormat] = useState<'12' | '24'>('24');
+  useEffect(() => { activeTimeFormat = timeFormat; }, [timeFormat]);
   const refresh = () =>
     fetch('/api/bookings')
       .then((r) => r.json())
@@ -188,6 +196,7 @@ export function AppShell({ signOutPath }: { signOutPath: string }) {
               operators={operators}
               go={setActive}
               timeFormat={timeFormat}
+              save={save}
             />
           )}
           {active === 'Booking Control' && (
@@ -209,10 +218,10 @@ export function AppShell({ signOutPath }: { signOutPath: string }) {
               save={save}
             />
           )}
-          {active === 'Calendar' && <Calendar items={bookings} />}{' '}
-          {active === 'Records' && (
-            <RecordsHub earnings={<EarningsV2 items={bookings} status={status} />} />
-          )}
+          {active === 'Calendar' && <Calendar items={bookings} />}
+          {active === 'Messages' && <Messages items={bookings} />}
+          {active === 'Records Hub' && <RecordsHub />}
+          {active === 'Earnings' && <EarningsV2 items={bookings} status={status} />}
           {active === 'Settings' && (
             <SettingsPage
               operators={operators}
@@ -301,11 +310,13 @@ function Dashboard({
   operators,
   go,
   timeFormat,
+  save,
 }: {
   bookings: Booking[];
   operators: string[];
   go: (s: string) => void;
   timeFormat: '12' | '24';
+  save: (d: Record<string, unknown>) => void;
 }) {
   const upcoming = bookings
       .filter((b) => b.status === 'upcoming')
@@ -349,6 +360,7 @@ function Dashboard({
         />
       </div>
       <TodayJobs jobs={upcoming.filter((booking) => booking.pickup_at.slice(0, 10) === new Date().toISOString().slice(0, 10))} go={go} />
+      <FastBooking operators={operators} save={save} />
     </>
   );
 }
@@ -513,6 +525,14 @@ function FastBooking({
       <form onSubmit={submit}>
         <div className="fast-grid top">
           <label>
+            Passenger name
+            <input name="passengerName" required />
+          </label>
+          <label>
+            Contact number
+            <input name="phone" type="tel" required />
+          </label>
+          <label>
             Pickup address
             <input name="pickup" required />
           </label>
@@ -647,16 +667,13 @@ function Bookings({
       <div className="records">
         {shown.map((b) => (
           <article className="record" key={b.id}>
-            <div className="avatar">{initials(b.passenger_name)}</div>
+            <time className="record-date"><b>{new Date(b.pickup_at).getDate()}</b>{new Date(b.pickup_at).toLocaleDateString('en-GB', { month: 'short' }).toUpperCase()}</time>
             <div className="record-main">
               <small>
-                {fmtDate(b.pickup_at)} · {fmtTime(b.pickup_at)} ·{' '}
-                <em>{b.operator}</em> · {b.booking_type || 'CASH'}
+                {fmtTime(b.pickup_at)} · <em>{b.operator}</em>
               </small>
-              <h3>{b.passenger_name}</h3>
-              <p>
-                {b.pickup} <span>→</span> {b.dropoff}
-              </p>
+              <h3>{b.pickup} <span>→</span> {b.dropoff}</h3>
+              <p>{b.passenger_name} · {b.fleet_tier} · {b.booking_type || 'CASH'}{b.status === 'complete' && b.driver_name ? ` · Driver ${b.driver_call_sign || ''} ${b.driver_name} ${b.driver_licence ? `(${b.driver_licence})` : ''}` : ''}</p>
             </div>
             <div className="record-fare">
               <b>£{b.fare.toFixed(2)}</b>
@@ -711,7 +728,11 @@ function QuickMessage({ booking, close }: { booking: Booking; close: () => void 
     'Journey Complete': `Thank you ${booking.passenger_name}. Your APX RIDE journey to ${booking.dropoff} is complete.`,
   };
   const [message, setMessage] = useState(templates['Vehicle En Route']);
-  return <div className="modal"><button className="scrim" onClick={close} /><section className="payment-card quick-message"><header><div><small>PASSENGER MESSAGE</small><h2>{booking.passenger_name}</h2></div><button onClick={close}><X /></button></header><label>Template<select onChange={(e) => setMessage(templates[e.target.value as keyof typeof templates])}>{Object.keys(templates).map((name) => <option key={name}>{name}</option>)}</select></label><label>Message<textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={5} /></label><footer><button onClick={() => navigator.clipboard.writeText(message)}><Copy />Copy</button><a className="primary sms-link" href={`sms:${booking.phone}?body=${encodeURIComponent(message)}`}>Open SMS</a></footer></section></div>;
+  const openSms = async () => {
+    await fetch('/api/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ bookingId: booking.id, channel: 'SMS', recipient: booking.phone, message }) });
+    window.location.href = `sms:${booking.phone}?body=${encodeURIComponent(message)}`;
+  };
+  return <div className="modal"><button className="scrim" onClick={close} /><section className="payment-card quick-message"><header><div><small>PASSENGER MESSAGE</small><h2>{booking.passenger_name}</h2></div><button onClick={close}><X /></button></header><label>Template<select onChange={(e) => setMessage(templates[e.target.value as keyof typeof templates])}>{Object.keys(templates).map((name) => <option key={name}>{name}</option>)}</select></label><label>Message<textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={5} /></label><footer><button onClick={() => navigator.clipboard.writeText(message)}><Copy />Copy</button><button className="primary sms-link" onClick={openSms}>Open SMS</button></footer></section></div>;
 }
 
 function PaymentModal({
@@ -1347,6 +1368,9 @@ function BookingModal({
               <option>ACCOUNT</option>
             </select>
           </label>
+          <label>Driver call sign<input name="driverCallSign" defaultValue={booking?.driver_call_sign || ''} /></label>
+          <label>Driver name<input name="driverName" defaultValue={booking?.driver_name || ''} /></label>
+          <label>Driver licence number<input name="driverLicence" defaultValue={booking?.driver_licence || ''} /></label>
           <label>
             Passengers
             <input
@@ -1504,26 +1528,16 @@ function BookingDetail({
 
 function Calendar({ items }: { items: Booking[] }) {
   const [tab, setTab] = useState<'list' | 'calendar'>('list'),
-    [days, setDays] = useState<string[]>(() => {
-      try {
-        return JSON.parse(localStorage.getItem('apx-unavailable') || '[]');
-      } catch {
-        return [];
-      }
-    }),
-    [day, setDay] = useState('');
+    [periods, setPeriods] = useState<Array<{ id: number; unavailable_date: string; full_day: number; start_time: string; end_time: string; reason: string }>>([]),
+    [marking, setMarking] = useState(false),
+    [day, setDay] = useState(new Date().toISOString().slice(0, 10));
+  const refreshAvailability = () => fetch('/api/availability').then((r) => r.json()).then((d) => Array.isArray(d) && setPeriods(d));
+  useEffect(() => { void refreshAvailability(); }, []);
   const jobs = items
     .filter((b) => b.status !== 'archived' && b.status !== 'complete')
     .sort((a, b) => a.pickup_at.localeCompare(b.pickup_at));
-  const unavailable = (d: string) => days.includes(d);
-  const addDay = () => {
-    if (day && !days.includes(day)) {
-      const n = [...days, day];
-      setDays(n);
-      localStorage.setItem('apx-unavailable', JSON.stringify(n));
-      setDay('');
-    }
-  };
+  const unavailable = (d: string) => periods.find((period) => period.unavailable_date === d);
+  const removeUnavailable = async (id: number) => { if (!confirm('Remove this unavailable period?')) return; await fetch(`/api/availability?id=${id}`, { method: 'DELETE' }); void refreshAvailability(); };
   const month = Array.from({ length: 35 }, (_, i) => {
     const d = new Date();
     d.setDate(1);
@@ -1591,7 +1605,7 @@ function Calendar({ items }: { items: Booking[] }) {
                 value={day}
                 onChange={(e) => setDay(e.target.value)}
               />
-              <button className="primary" onClick={addDay}>
+              <button className="primary" onClick={() => setMarking(true)}>
                 <Plus />
                 Add unavailable day
               </button>
@@ -1610,17 +1624,7 @@ function Calendar({ items }: { items: Booking[] }) {
                 <button
                   key={i}
                   className={unavailable(key) ? 'unavailable' : ''}
-                  onClick={() =>
-                    unavailable(key) &&
-                    setDays((v) => {
-                      const n = v.filter((x) => x !== key);
-                      localStorage.setItem(
-                        'apx-unavailable',
-                        JSON.stringify(n),
-                      );
-                      return n;
-                    })
-                  }
+                  onClick={() => { const period = unavailable(key); if (period) void removeUnavailable(period.id); else { setDay(key); setMarking(true); } }}
                 >
                   <span>{d.getDate()}</span>
                   {dayJobs.length > 0 && (
@@ -1650,15 +1654,21 @@ function Calendar({ items }: { items: Booking[] }) {
                       )}
                     </div>
                   )}
-                  {unavailable(key) && <em>Unavailable</em>}
+                  {unavailable(key) && <em title={unavailable(key)?.reason}>{unavailable(key)?.full_day ? 'Unavailable' : `${unavailable(key)?.start_time}–${unavailable(key)?.end_time}`}</em>}
                 </button>
               );
             })}
           </div>
+          {marking && <AvailabilityModal day={day} close={() => setMarking(false)} saved={() => { setMarking(false); void refreshAvailability(); }} />}
         </>
       )}
     </Page>
   );
+}
+function AvailabilityModal({ day, close, saved }: { day: string; close: () => void; saved: () => void }) {
+  const [fullDay, setFullDay] = useState(true);
+  const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const data = Object.fromEntries(new FormData(event.currentTarget)); const response = await fetch('/api/availability', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ date: data.date, fullDay, startTime: data.startTime || '', endTime: data.endTime || '', reason: data.reason || '' }) }); if (response.ok) saved(); else alert('Availability could not be saved.'); };
+  return <div className="modal"><button className="scrim" onClick={close} /><form className="payment-card" onSubmit={submit}><header><div><small>DISPATCH AVAILABILITY</small><h2>Add unavailable period</h2></div><button type="button" onClick={close}><X /></button></header><label>Date<input name="date" type="date" defaultValue={day} required /></label><label className="check-label"><input type="checkbox" checked={fullDay} onChange={(e) => setFullDay(e.target.checked)} />Full day</label>{!fullDay && <div className="form-grid"><label>Start time<input name="startTime" type="time" required /></label><label>End time<input name="endTime" type="time" required /></label></div>}<label>Reason<input name="reason" placeholder="Holiday, appointment, vehicle maintenance…" required /></label><footer><button type="button" onClick={close}>Cancel</button><button className="primary"><Save />Save unavailable period</button></footer></form></div>;
 }
 function Messages({ items }: { items: Booking[] }) {
   const defaults = {
@@ -1924,6 +1934,7 @@ type ExpenseRecord = {
   category: string;
   amount: number;
   notes: string;
+  driver_call_sign?: string;
 };
 function EarningsV2({
   items,
@@ -1938,7 +1949,8 @@ function EarningsV2({
   ) => void;
 }) {
   const [source, setSource] = useState('ALL');
-  const done = items.filter((b) => b.status === 'complete' && (source === 'ALL' || b.operator === source)),
+  const drivers = Array.from(new Map(items.filter((item) => item.driver_call_sign || item.driver_name).map((item) => [item.driver_call_sign || item.driver_name || '', `${item.driver_call_sign || 'Driver'}${item.driver_name ? ` · ${item.driver_name}` : ''}`])).entries());
+  const done = items.filter((b) => b.status === 'complete' && (source === 'ALL' || (b.driver_call_sign || b.driver_name) === source)),
     cash = done.filter((b) => (b.booking_type || 'CASH') === 'CASH'),
     accounts = done.filter((b) => b.booking_type === 'ACCOUNT'),
     gross = done.reduce((a, b) => a + b.fare, 0),
@@ -1951,7 +1963,8 @@ function EarningsV2({
   useEffect(() => {
     refreshExpenses();
   }, []);
-  const expenseTotal = expenses.reduce((a, e) => a + e.amount, 0),
+  const shownExpenses = expenses.filter((e) => source === 'ALL' || e.driver_call_sign === source),
+    expenseTotal = shownExpenses.reduce((a, e) => a + e.amount, 0),
     cashTotal = cash.reduce((a, b) => a + b.fare, 0),
     receivable = accounts
       .filter((b) => b.account_status !== 'settled')
@@ -1967,6 +1980,7 @@ function EarningsV2({
         category: d.category,
         amount: +d.amount,
         notes: d.notes,
+        driverCallSign: d.driverCallSign || '',
       }),
     });
     e.currentTarget.reset();
@@ -1979,9 +1993,9 @@ function EarningsV2({
   const cats = ['Fuel', 'Servicing', 'Tolls', 'Wash', 'Other'];
   return (
     <Page
-      title={`Earnings Analytics${source === 'ALL' ? '' : ` — ${source}`}`}
+      title={source === 'ALL' ? 'Company Earnings Overview' : `Driver Earnings — ${drivers.find(([key]) => key === source)?.[1] || source}`}
       sub="Revenue, collections, receivables and operating costs in one ledger."
-      action={<div className="earnings-actions"><select value={source} onChange={(e) => setSource(e.target.value)}><option value="ALL">All operators</option>{Array.from(new Set(items.map((item) => item.operator))).map((name) => <option key={name}>{name}</option>)}</select><button onClick={() => window.print()}><Printer />Generate statement</button></div>}
+      action={<div className="earnings-actions"><select value={source} onChange={(e) => setSource(e.target.value)}><option value="ALL">All Drivers (Fleet Overview)</option>{drivers.map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select><button onClick={() => window.print()}><Printer />Generate Driver Statement</button></div>}
     >
       <div className="finance-kpis">
         <FinanceCard
@@ -2005,7 +2019,7 @@ function EarningsV2({
           className="red"
           label="Total expenses"
           value={expenseTotal}
-          detail={`${expenses.length} entries`}
+          detail={`${shownExpenses.length} entries`}
         />
         <FinanceCard
           className="gold"
@@ -2035,7 +2049,7 @@ function EarningsV2({
           Expenses
         </button>
       </div>
-      {tab === 'charts' && <FinancialCharts rows={done} expenses={expenses} />}
+      {tab === 'charts' && <FinancialCharts rows={done} expenses={shownExpenses} />}
       {tab === 'cash' && <LedgerTable rows={cash} cash />}
       {tab === 'accounts' && (
         <LedgerTable
@@ -2062,6 +2076,7 @@ function EarningsV2({
                 required
               />
               <input name="notes" placeholder="Notes" />
+              <select name="driverCallSign"><option value="">Company expense</option>{drivers.map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select>
               <button className="primary">
                 <Plus />
                 Add Expense
@@ -2073,10 +2088,10 @@ function EarningsV2({
               <FinanceCard
                 key={c}
                 label={c}
-                value={expenses
+                value={shownExpenses
                   .filter((e) => e.category === c)
                   .reduce((a, e) => a + e.amount, 0)}
-                detail={`${expenses.filter((e) => e.category === c).length} entries`}
+                detail={`${shownExpenses.filter((e) => e.category === c).length} entries`}
               />
             ))}
           </div>
@@ -2092,7 +2107,7 @@ function EarningsV2({
                 </tr>
               </thead>
               <tbody>
-                {expenses.map((e) => (
+                {shownExpenses.map((e) => (
                   <tr key={e.id}>
                     <td>{fmtDate(e.expense_date)}</td>
                     <td>{e.category}</td>
@@ -2332,6 +2347,7 @@ const fmtTime = (s: string) =>
   new Date(s).toLocaleTimeString('en-GB', {
     hour: '2-digit',
     minute: '2-digit',
+    hour12: activeTimeFormat === '12',
   });
 function vehicle(p: number, l: number, s: number) {
   if (p <= 4 && l <= 2 && s <= 2) return 'Saloon';

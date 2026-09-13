@@ -112,9 +112,7 @@
 }
 
 .fast-bar .fast-grid.top {
-  grid-template-columns:
-    minmax(190px, 1.4fr) minmax(190px, 1.4fr) minmax(145px, 0.8fr)
-    minmax(130px, 0.7fr) minmax(125px, 0.65fr);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
 .fast-bar .fast-grid.bottom {
