@@ -837,8 +837,7 @@ function Calculator({
     if (!date || tariffOverride) return;
     const trip = new Date(date);
     const hour = trip.getHours();
-    const weekend = trip.getDay() === 0 || trip.getDay() === 6;
-    setTariff(weekend || hour < 6 || hour >= 22 ? 'night' : 'day');
+    setTariff(isEnglandWalesBankHoliday(trip) || hour < 6 || hour >= 22 ? 'night' : 'day');
   }, [date, tariffOverride]);
   const cfg = rates[tariff][tier],
     chargeableMiles = Math.max(0, distance - 1),
@@ -2399,6 +2398,54 @@ function vehicle(p: number, l: number, s: number) {
   if (p <= 4 && l <= 3 && s <= 3) return 'Estate';
   if (p <= 5 && l <= 4 && s <= 4) return '6-seater';
   return '7-seater';
+}
+
+function isEnglandWalesBankHoliday(date: Date) {
+  const year = date.getFullYear();
+  const key = (value: Date) => `${value.getFullYear()}-${value.getMonth()}-${value.getDate()}`;
+  const holidays = new Set<string>();
+  const addWithSubstitute = (month: number, day: number) => {
+    const actual = new Date(year, month, day);
+    holidays.add(key(actual));
+    if (actual.getDay() === 6) holidays.add(key(new Date(year, month, day + 2)));
+    if (actual.getDay() === 0) holidays.add(key(new Date(year, month, day + 1)));
+  };
+  const nthMonday = (month: number, occurrence: number) => {
+    const first = new Date(year, month, 1);
+    return new Date(year, month, 1 + ((8 - first.getDay()) % 7) + (occurrence - 1) * 7);
+  };
+  const lastMonday = (month: number) => {
+    const last = new Date(year, month + 1, 0);
+    return new Date(year, month, last.getDate() - ((last.getDay() + 6) % 7));
+  };
+  addWithSubstitute(0, 1);
+  const easter = easterSunday(year);
+  holidays.add(key(new Date(year, easter.getMonth(), easter.getDate() - 2)));
+  holidays.add(key(new Date(year, easter.getMonth(), easter.getDate() + 1)));
+  holidays.add(key(nthMonday(4, 1)));
+  holidays.add(key(lastMonday(4)));
+  holidays.add(key(lastMonday(7)));
+  const christmas = new Date(year, 11, 25);
+  const boxing = new Date(year, 11, 26);
+  holidays.add(key(christmas));
+  holidays.add(key(boxing));
+  const used = new Set([key(christmas), key(boxing)]);
+  for (const actual of [christmas, boxing]) {
+    if (actual.getDay() === 0 || actual.getDay() === 6) {
+      const substitute = new Date(actual);
+      do substitute.setDate(substitute.getDate() + 1); while (substitute.getDay() === 0 || substitute.getDay() === 6 || used.has(key(substitute)));
+      used.add(key(substitute)); holidays.add(key(substitute));
+    }
+  }
+  return holidays.has(key(date));
+}
+
+function easterSunday(year: number) {
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100, d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
 }
 
 function printCustomerDocument(input: {
