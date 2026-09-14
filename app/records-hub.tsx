@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { Download, FileDown, Plus, Save, X } from 'lucide-react';
+import { ChevronDown, Download, FileDown, Plus, Save, X } from 'lucide-react';
 
 type RecordRow = {
   id: number;
@@ -16,6 +16,7 @@ type RecordRow = {
 };
 
 type Field = { name: string; label: string; type?: string; required?: boolean; options?: string[] };
+type DocumentMeta = { id: number; field_name: string; file_name: string; content_type: string; uploaded_at: string };
 const schemas: Record<string, { label: string; singular: string; fields: Field[]; statuses: string[] }> = {
   roster: {
     label: 'Driver & Vehicle Roster', singular: 'Driver & Vehicle', statuses: ['ACTIVE', 'INACTIVE', 'SUSPENDED'],
@@ -52,13 +53,14 @@ const schemas: Record<string, { label: string; singular: string; fields: Field[]
       { name: 'driver', label: 'Driver name', required: true },
       { name: 'vrm', label: 'Vehicle registration', required: true },
       { name: 'passengerContact', label: 'Passenger contact' },
-      { name: 'returnAttempt', label: 'Evidence of attempt to return property', required: true },
+      { name: 'returnAttempt', label: 'Details of attempt to return property', required: true },
+      { name: 'returnEvidence', label: 'Evidence of attempt to return property', type: 'file' },
       { name: 'resolutionDate', label: 'Resolution date', type: 'date' },
-      { name: 'notes', label: 'Notes' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
   },
   complaint: {
-    label: 'Complaints', singular: 'Complaint', statuses: ['OPEN', 'UNDER INVESTIGATION', 'RESOLVED'],
+    label: 'Complaints', singular: 'Complaint', statuses: ['PENDING', 'IN PROGRESS', 'RESOLVED'],
     fields: [
       { name: 'complainant', label: 'Complainant full name', required: true },
       { name: 'contact', label: 'Complainant contact', required: true },
@@ -66,8 +68,8 @@ const schemas: Record<string, { label: string; singular: string; fields: Field[]
       { name: 'driver', label: 'Driver name', required: true },
       { name: 'driverLicence', label: 'Driver licence number', required: true },
       { name: 'category', label: 'Category', required: true, options: ['Driver Conduct', 'Fare Dispute', 'Vehicle Condition', 'Punctuality / Delay', 'Other'] },
-      { name: 'incident', label: 'Nature and details of complaint', required: true },
-      { name: 'actionTaken', label: 'Investigation / action taken', required: true },
+      { name: 'incident', label: 'Nature and details of complaint', type: 'textarea', required: true },
+      { name: 'actionTaken', label: 'Investigation / action taken', type: 'textarea', required: true },
     ],
   },
   council_incident: {
@@ -76,7 +78,7 @@ const schemas: Record<string, { label: string; singular: string; fields: Field[]
       { name: 'driverVehicle', label: 'Driver / vehicle reference', required: true },
       { name: 'incidentTime', label: 'Incident time', type: 'time', required: true },
       { name: 'category', label: 'Disclosure category', required: true, options: ['Driving Endorsements / Convictions / Cautions', 'Arrests', 'Change of Address', 'Vehicle Accidents', 'Other Mandatory Council Disclosure'] },
-      { name: 'summary', label: 'Incident summary', required: true },
+      { name: 'summary', label: 'Incident summary', type: 'textarea', required: true },
       { name: 'proofFile', label: 'Document / proof upload', type: 'file' },
       { name: 'councilReference', label: 'Council reference' },
     ],
@@ -113,16 +115,17 @@ function Register({ type }: { type: string }) {
     })].map((line) => line.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(',')).join('\n');
     download(csv, `apx-${type}-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv');
   };
+  const exportPdf = () => exportRecordsPdf(schema.label, schema.fields, filtered);
   return (
     <section className="panel compliance-register">
-      <header className="register-head"><div><small>12 MONTH MINIMUM RETENTION</small><h3>{schema.label} register</h3></div><div><button onClick={exportCsv}><Download />Export CSV</button><button onClick={() => window.print()}><FileDown />Export PDF</button><button className="primary" onClick={() => setEditing(null)}><Plus />Add {schema.singular}</button></div></header>
-      <input className="record-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${schema.label.toLowerCase()} records`} />
+      <header className="register-head"><div><small>12 MONTH MINIMUM RETENTION</small><h3>{schema.label} register</h3></div><div><button onClick={exportCsv}><Download />Export CSV</button><button onClick={exportPdf}><FileDown />Export PDF</button><button className="primary" onClick={() => setEditing(null)}><Plus />{type === 'roster' ? 'Add Driver & Vehicle' : `Add ${schema.singular}`}</button></div></header>
+      <input className="record-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={type === 'roster' ? 'Search by call sign, driver name or vehicle registration' : `Search ${schema.label.toLowerCase()} records`} />
       <div className="compliance-list">
         {filtered.map((row) => {
           const data = JSON.parse(row.data_json || '{}') as Record<string, string>;
-          return <details key={row.id} className="compliance-row">
-            <summary><div><b>{primaryValue(type, data, row.reference)}</b><span>{row.reference} · {row.event_date}</span></div><div><span className={`retention-badge ${expiryState(data)}`}>{expiryState(data).replace('_', ' ')}</span><span className="pill">{row.status}</span><button onClick={(event) => { event.preventDefault(); setEditing(row); }}>Edit</button></div></summary>
-            <dl>{schema.fields.map((field) => <div key={field.name}><dt>{field.label}</dt><dd>{data[field.name] || '—'}</dd></div>)}<div><dt>Protected until at least</dt><dd>{row.retention_until}</dd></div><div><dt>Last updated</dt><dd>{new Date(row.updated_at).toLocaleString('en-GB')}</dd></div></dl>
+          return <details key={row.id} className={`compliance-row ${type === 'roster' ? 'roster-row' : ''}`}>
+            <summary>{type === 'roster' ? <RosterSummary data={data} row={row} /> : <div className="record-summary-main"><b>{primaryValue(type, data, row.reference)}</b><span>{row.reference} · {row.event_date}</span></div>}<div className="summary-actions"><span className={`retention-badge ${expiryState(data)}`}>{expiryState(data).replace('_', ' ')}</span><span className={`status-badge ${statusClass(row.status)}`}>{row.status}</span><button onClick={(event) => { event.preventDefault(); setEditing(row); }}>Edit</button><ChevronDown className="accordion-arrow" /></div></summary>
+            {type === 'roster' ? <RosterDetails data={data} row={row} edit={() => setEditing(row)} /> : <><div className="expanded-status"><span className={`status-badge ${statusClass(row.status)}`}>{row.status}</span></div><dl className={type === 'complaint' ? 'complaint-details' : ''}>{schema.fields.filter((field) => field.type !== 'file').map((field) => <div key={field.name}><dt>{field.label}</dt><dd>{data[field.name] || '—'}</dd></div>)}<div><dt>Protected until at least</dt><dd>{row.retention_until}</dd></div><div><dt>Last updated</dt><dd>{new Date(row.updated_at).toLocaleString('en-GB')}</dd></div></dl><RecordDocuments recordId={row.id} /></>}
           </details>;
         })}
         {!filtered.length && <p className="empty-register">No {schema.label.toLowerCase()} records logged.</p>}
@@ -140,11 +143,33 @@ function RecordModal({ schema, type, row, close, saved }: { schema: (typeof sche
     const response = await fetch('/api/records', { method: row ? 'PUT' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
     if (!response.ok) { alert('The record could not be saved. Please try again.'); return; }
     const result = await response.json() as { id?: number | string };
-    const proof = raw.get('proofFile');
-    if (proof instanceof File && proof.size && (result.id || row?.id)) { const upload = new FormData(); upload.set('file', proof); upload.set('recordId', String(result.id || row?.id)); upload.set('fieldName', 'proofFile'); const uploaded = await fetch('/api/documents', { method: 'POST', body: upload }); if (!uploaded.ok) { alert('The record was saved, but the document upload failed.'); } }
+    const recordId = result.id || row?.id;
+    for (const field of schema.fields.filter((item) => item.type === 'file')) {
+      const proof = raw.get(field.name);
+      if (proof instanceof File && proof.size && recordId) { const upload = new FormData(); upload.set('file', proof); upload.set('recordId', String(recordId)); upload.set('fieldName', field.name); const uploaded = await fetch('/api/documents', { method: 'POST', body: upload }); if (!uploaded.ok) { alert(`The record was saved, but ${field.label.toLowerCase()} could not be uploaded.`); return; } }
+    }
     saved();
   };
-  return <div className="modal"><button className="scrim" aria-label="Close record form" onClick={close} /><form className="record-modal" onSubmit={submit}><header><div><small>COMPLIANCE RECORD</small><h2>{row ? 'Edit' : 'Add'} {schema.singular}</h2></div><button type="button" aria-label="Close record form" onClick={close}><X /></button></header><div className="record-form-grid"><label>Reference<input name="reference" defaultValue={row?.reference || ''} placeholder="Generated if left blank" /></label><label>Record date<input name="eventDate" type="date" required defaultValue={row?.event_date || new Date().toISOString().slice(0, 10)} /></label><label>Status<select name="status" defaultValue={row?.status || schema.statuses[0]}>{schema.statuses.map((status) => <option key={status}>{status}</option>)}</select></label>{schema.fields.map((field) => <label key={field.name}>{field.label}{field.options ? <select name={field.name} required={field.required} defaultValue={data[field.name] || field.options[0]}>{field.options.map((option) => <option key={option}>{option}</option>)}</select> : <input name={field.name} type={field.type || 'text'} accept={field.type === 'file' ? '.pdf,.jpg,.jpeg,.png' : undefined} required={field.required} defaultValue={field.type === 'file' ? undefined : data[field.name] || ''} />}</label>)}</div><p className="retention-note">This record is retained for at least 12 months. Every change creates a preserved revision; deletion is disabled.</p><footer><button type="button" onClick={close}>Cancel</button><button className="primary"><Save />Save revision</button></footer></form></div>;
+  const statuses = row && !schema.statuses.includes(row.status) ? [row.status, ...schema.statuses] : schema.statuses;
+  return <div className="modal"><button className="scrim" aria-label="Close record form" onClick={close} /><form className={`record-modal ${type === 'complaint' ? 'complaint-modal' : ''}`} onSubmit={submit}><header><div><small>COMPLIANCE RECORD</small><h2>{row ? 'Edit' : 'Add'} {schema.singular}</h2></div><button type="button" aria-label="Close record form" onClick={close}><X /></button></header><div className="record-form-grid"><label>Reference<input name="reference" defaultValue={row?.reference || ''} placeholder="Generated if left blank" /></label><label>Record date<input name="eventDate" type="date" required defaultValue={row?.event_date || new Date().toISOString().slice(0, 10)} /></label><label>Status<select name="status" defaultValue={row?.status || statuses[0]}>{statuses.map((status) => <option key={status}>{status}</option>)}</select></label>{schema.fields.map((field) => <label key={field.name} className={field.type === 'textarea' ? 'record-field-wide' : ''}>{field.label}{field.options ? <select name={field.name} required={field.required} defaultValue={data[field.name] || field.options[0]}>{field.options.map((option) => <option key={option}>{option}</option>)}</select> : field.type === 'textarea' ? <textarea name={field.name} required={field.required} defaultValue={data[field.name] || ''} rows={6} /> : <input name={field.name} type={field.type || 'text'} accept={field.type === 'file' ? '.pdf,.jpg,.jpeg,.png' : undefined} required={field.required} defaultValue={field.type === 'file' ? undefined : data[field.name] || ''} />}</label>)}</div>{row && <RecordDocuments recordId={row.id} />}<p className="retention-note">This record is retained for at least 12 months. Every change creates a preserved revision; deletion is disabled.</p><footer><button type="button" onClick={close}>Cancel</button><button className="primary"><Save />Save revision</button></footer></form></div>;
+}
+
+function RosterSummary({ data, row }: { data: Record<string, string>; row: RecordRow }) {
+  return <div className="roster-summary"><span className="call-sign">{data.callSign || '—'}</span><div><b>{data.callSign ? `${data.callSign}. ` : ''}{data.fullName || row.reference}</b><small>PHV Licence: {data.badgeNumber || '—'} · Tel: {data.phone || '—'}</small></div><em>{data.vrm || 'NO VRM'} · {data.makeModelColour || 'Vehicle not assigned'}</em></div>;
+}
+
+function RosterDetails({ data, row, edit }: { data: Record<string, string>; row: RecordRow; edit: () => void }) {
+  return <div className="roster-detail-grid"><section><h4>DRIVER COMPLIANCE PROFILE</h4><RosterLine label="Full name" value={data.fullName} /><RosterLine label="Current address" value={data.address} /><RosterLine label="PHV licence expiry" value={data.badgeExpiry} /><RosterLine label="DVLA licence number" value={data.dvlaNumber} /><RosterLine label="Engagement start date" value={data.engagementDate} /><RosterLine label="Statutory retention tag" value={row.status} /><button onClick={edit}>Edit Profile</button></section><section><h4>ASSIGNED VEHICLE PROFILE ({data.vrm || 'VRM'})</h4><RosterLine label="Make, model & colour" value={data.makeModelColour} /><RosterLine label="Registered keeper" value={data.registeredKeeper} /><RosterLine label="MOT expiry date" value={withValidity(data.motExpiry)} /><RosterLine label="Insurance policy status" value={withValidity(data.insuranceExpiry)} /><RosterLine label="Council PHV licence status" value={withValidity(data.phvExpiry)} /><button onClick={edit}>Update Vehicle</button></section></div>;
+}
+
+function RosterLine({ label, value }: { label: string; value?: string }) { return <div className="roster-line"><span>{label}</span><b>{value || '—'}</b></div>; }
+function withValidity(value?: string) { if (!value) return '—'; return `${value} · ${new Date(value).getTime() >= Date.now() ? 'Valid' : 'Expired'}`; }
+
+function RecordDocuments({ recordId }: { recordId: number }) {
+  const [documents, setDocuments] = useState<DocumentMeta[]>([]);
+  useEffect(() => { void fetch(`/api/documents?recordId=${recordId}`).then((response) => response.ok ? response.json() : []).then((items) => setDocuments(Array.isArray(items) ? items : [])); }, [recordId]);
+  if (!documents.length) return null;
+  return <section className="record-documents"><h4>ATTACHED DOCUMENTS</h4><div>{documents.map((document) => <a key={document.id} href={`/api/documents?id=${document.id}&preview=1`} target="_blank" rel="noreferrer">{document.content_type.startsWith('image/') ? <img src={`/api/documents?id=${document.id}&preview=1`} alt="" /> : <FileDown />}<span>{document.file_name}<small>View or download</small></span></a>)}</div></section>;
 }
 
 function primaryValue(type: string, data: Record<string, string>, fallback: string) {
@@ -159,6 +184,64 @@ function expiryState(data: Record<string, string>) {
   if (!values.length) return 'retained';
   const soonest = Math.min(...values); const days = (soonest - Date.now()) / 86400000;
   return days < 0 ? 'expired' : days <= 30 ? 'expiring_soon' : 'active';
+}
+
+function statusClass(status: string) {
+  const value = status.toUpperCase();
+  if (value.includes('RESOLVED') || value.includes('ACTIVE') || value.includes('CONFIRMED') || value.includes('RETURNED')) return 'status-good';
+  if (value.includes('PROGRESS') || value.includes('INVESTIGATION') || value.includes('REPORTED') || value.includes('STORAGE')) return 'status-progress';
+  return 'status-pending';
+}
+
+function exportRecordsPdf(title: string, fields: Field[], rows: RecordRow[]) {
+  const lines = [
+    'APX RIDE',
+    `${title.toUpperCase()} REGISTER`,
+    `Generated: ${new Date().toLocaleString('en-GB')}`,
+    '',
+  ];
+  rows.forEach((row, index) => {
+    const data = JSON.parse(row.data_json || '{}') as Record<string, string>;
+    lines.push(`${index + 1}. ${row.reference} | ${row.event_date} | ${row.status}`);
+    fields.filter((field) => field.type !== 'file').forEach((field) => lines.push(`   ${field.label}: ${data[field.name] || '-'}`));
+    lines.push(`   Retention until: ${row.retention_until}`, '');
+  });
+  if (!rows.length) lines.push('No records in the current filtered view.');
+  downloadPdf(lines, `apx-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+function downloadPdf(sourceLines: string[], filename: string) {
+  const ascii = (value: string) => value.normalize('NFKD').replace(/[^\x20-\x7E]/g, '').replace(/([\\()])/g, '\\$1');
+  const wrapped = sourceLines.flatMap((line) => {
+    const clean = ascii(line);
+    if (!clean) return [''];
+    const result: string[] = [];
+    for (let start = 0; start < clean.length; start += 92) result.push(clean.slice(start, start + 92));
+    return result;
+  });
+  const pages: string[][] = [];
+  for (let start = 0; start < wrapped.length; start += 48) pages.push(wrapped.slice(start, start + 48));
+  if (!pages.length) pages.push(['No records']);
+  const objects: string[] = [];
+  const pageObjectIds = pages.map((_, index) => 4 + index * 2);
+  objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+  objects[2] = `<< /Type /Pages /Kids [${pageObjectIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pages.length} >>`;
+  objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
+  pages.forEach((page, index) => {
+    const pageId = pageObjectIds[index];
+    const contentId = pageId + 1;
+    const commands = ['BT', '/F1 9 Tf', '46 795 Td', '12 TL', ...page.flatMap((line, lineIndex) => [`(${line}) Tj`, lineIndex < page.length - 1 ? 'T*' : '']), 'ET'].filter(Boolean).join('\n');
+    objects[pageId] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentId} 0 R >>`;
+    objects[contentId] = `<< /Length ${commands.length} >>\nstream\n${commands}\nendstream`;
+  });
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  for (let id = 1; id < objects.length; id++) { offsets[id] = pdf.length; pdf += `${id} 0 obj\n${objects[id]}\nendobj\n`; }
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objects.length}\n0000000000 65535 f \n`;
+  for (let id = 1; id < objects.length; id++) pdf += `${String(offsets[id]).padStart(10, '0')} 00000 n \n`;
+  pdf += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  download(pdf, filename, 'application/pdf');
 }
 
 function download(content: string, filename: string, type: string) {

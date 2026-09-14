@@ -51,12 +51,29 @@ type Booking = {
 };
 type Rate = { base: number; rate: number };
 type Rates = Record<'Saloon' | 'Estate' | '6-seater' | '7-seater', Rate>;
+type Tariff = 'day' | 'night';
+type TariffRates = Record<Tariff, Rates>;
 const defaultRates: Rates = {
   Saloon: { base: 6, rate: 1.6 },
   Estate: { base: 7, rate: 1.7 },
   '6-seater': { base: 8, rate: 2.2 },
   '7-seater': { base: 9, rate: 2.5 },
 };
+const defaultTariffRates: TariffRates = {
+  day: defaultRates,
+  night: {
+    Saloon: { base: 7.5, rate: 2 },
+    Estate: { base: 8.5, rate: 2.15 },
+    '6-seater': { base: 10, rate: 2.75 },
+    '7-seater': { base: 11, rate: 3.1 },
+  },
+};
+function normaliseRates(value: unknown): TariffRates {
+  const input = value as Partial<TariffRates> & Partial<Rates> | null;
+  if (input?.day && input?.night) return input as TariffRates;
+  if (input?.Saloon) return { day: input as Rates, night: input as Rates };
+  return defaultTariffRates;
+}
 const localStorage =
   typeof window === 'undefined'
     ? { getItem: () => null, setItem: () => {} }
@@ -81,7 +98,7 @@ export function AppShell({ signOutPath }: { signOutPath: string }) {
     [bookings, setBookings] = useState<Booking[]>([]),
     [loading, setLoading] = useState(true);
   const [operators, setOperators] = useState<string[]>(['APX RIDE']),
-    [rates, setRates] = useState<Rates>(defaultRates),
+    [rates, setRates] = useState<TariffRates>(defaultTariffRates),
     [fuelRate, setFuelRate] = useState(50),
     [timeFormat, setTimeFormat] = useState<'12' | '24'>('24');
   useEffect(() => { activeTimeFormat = timeFormat; }, [timeFormat]);
@@ -95,7 +112,7 @@ export function AppShell({ signOutPath }: { signOutPath: string }) {
     try {
       const s = JSON.parse(localStorage.getItem('apx-settings') || '{}');
       if (s.operators) setOperators(s.operators);
-      if (s.rates) setRates(s.rates);
+      if (s.rates) setRates(normaliseRates(s.rates));
       if (s.fuelRate !== undefined) setFuelRate(s.fuelRate);
     } catch {}
     void Promise.all([
@@ -103,7 +120,7 @@ export function AppShell({ signOutPath }: { signOutPath: string }) {
       fetch('/api/settings').then((r) => r.json()).then((value: unknown) => {
         const server = value as Record<string, unknown>;
         if (server.operators_json) setOperators(JSON.parse(String(server.operators_json)));
-        if (server.rates_json && server.rates_json !== '{}') setRates(JSON.parse(String(server.rates_json)));
+        if (server.rates_json && server.rates_json !== '{}') setRates(normaliseRates(JSON.parse(String(server.rates_json))));
         if (server.fuel_per_100 !== undefined) setFuelRate(Number(server.fuel_per_100));
         if (server.time_format === '12' || server.time_format === '24') setTimeFormat(server.time_format);
       }),
@@ -196,7 +213,6 @@ export function AppShell({ signOutPath }: { signOutPath: string }) {
               operators={operators}
               go={setActive}
               timeFormat={timeFormat}
-              save={save}
             />
           )}
           {active === 'Booking Control' && (
@@ -310,16 +326,14 @@ function Dashboard({
   operators,
   go,
   timeFormat,
-  save,
 }: {
   bookings: Booking[];
   operators: string[];
   go: (s: string) => void;
   timeFormat: '12' | '24';
-  save: (d: Record<string, unknown>) => void;
 }) {
   const upcoming = bookings
-      .filter((b) => b.status === 'upcoming')
+      .filter((b) => b.status === 'upcoming' || b.status === 'in_progress')
       .sort((a, b) => a.pickup_at.localeCompare(b.pickup_at)),
     next = upcoming[0],
     done = bookings.filter((b) => b.status === 'complete'),
@@ -360,7 +374,6 @@ function Dashboard({
         />
       </div>
       <TodayJobs jobs={upcoming.filter((booking) => booking.pickup_at.slice(0, 10) === new Date().toISOString().slice(0, 10))} go={go} />
-      <FastBooking operators={operators} save={save} />
     </>
   );
 }
@@ -404,20 +417,24 @@ function Dispatch({ next, following, go }: { next?: Booking; following?: Booking
             <strong>{fmtTime(next.pickup_at)}</strong>
             <span>{next.operator}</span>
           </div>
-          <div className="route">
-            <i />
-            <div>
+          <div className="route dispatch-route-grid">
+            <div className="route-point">
+              <i />
+              <div>
               <small>PICKUP</small>
               <b>{next.pickup}</b>
               <p>
                 {next.passenger_name} · {next.passengers} passenger(s)
               </p>
+              </div>
             </div>
-            <i />
-            <div>
+            <div className="route-point">
+              <i />
+              <div>
               <small>DROP-OFF</small>
               <b>{next.dropoff}</b>
               <p>{next.notes || 'No dispatch notes'}</p>
+              </div>
             </div>
           </div>
           <div className="job">
@@ -628,7 +645,8 @@ function Bookings({
       : tab === 'progress'
         ? b.status === 'in_progress'
         : b.status === 'upcoming',
-  ).filter((b) => tab !== 'complete' || ((!from || b.pickup_at.slice(0, 10) >= from) && (!to || b.pickup_at.slice(0, 10) <= to)));
+  ).filter((b) => tab !== 'complete' || ((!from || b.pickup_at.slice(0, 10) >= from) && (!to || b.pickup_at.slice(0, 10) <= to)))
+    .sort((a, b) => a.pickup_at.localeCompare(b.pickup_at));
   const shown = tab === 'complete' ? filtered.slice((page - 1) * 10, page * 10) : filtered;
   return (
     <Page
@@ -670,7 +688,7 @@ function Bookings({
             <time className="record-date"><b>{new Date(b.pickup_at).getDate()}</b>{new Date(b.pickup_at).toLocaleDateString('en-GB', { month: 'short' }).toUpperCase()}</time>
             <div className="record-main">
               <small>
-                {fmtTime(b.pickup_at)} · <em>{b.operator}</em>
+                APX-{String(b.id).padStart(5, '0')} · {fmtTime(b.pickup_at)} · <em>{b.operator}</em>
               </small>
               <h3>{b.pickup} <span>→</span> {b.dropoff}</h3>
               <p>{b.passenger_name} · {b.fleet_tier} · {b.booking_type || 'CASH'}{b.status === 'complete' && b.driver_name ? ` · Driver ${b.driver_call_sign || ''} ${b.driver_name} ${b.driver_licence ? `(${b.driver_licence})` : ''}` : ''}</p>
@@ -789,18 +807,20 @@ function Calculator({
   operators,
   save,
 }: {
-  rates: Rates;
+  rates: TariffRates;
   fuelRate: number;
   operators: string[];
   save: (d: Record<string, unknown>) => void;
 }) {
-  const [model, setModel] = useState<'A' | 'B'>('A'),
+  const [tariff, setTariff] = useState<Tariff>('day'),
+    [tariffOverride, setTariffOverride] = useState(false),
     [doc, setDoc] = useState<'quote' | 'confirmation'>('quote'),
     [tier, setTier] = useState<keyof Rates>('Saloon'),
     [distance, setDistance] = useState(0),
     [duration, setDuration] = useState(0),
     [waiting, setWaiting] = useState(0),
     [airport, setAirport] = useState(0),
+    [toll, setToll] = useState(0),
     [fuel, setFuel] = useState(true),
     [fixed, setFixed] = useState(''),
     [passenger, setPassenger] = useState(''),
@@ -813,19 +833,27 @@ function Calculator({
     [pax, setPax] = useState(1),
     [large, setLarge] = useState(0),
     [small, setSmall] = useState(0);
-  const cfg = rates[tier],
-    miles = model === 'A' ? distance : Math.max(0, distance - 1),
-    distanceCharge = miles * cfg.rate,
+  useEffect(() => {
+    if (!date || tariffOverride) return;
+    const trip = new Date(date);
+    const hour = trip.getHours();
+    const weekend = trip.getDay() === 0 || trip.getDay() === 6;
+    setTariff(weekend || hour < 6 || hour >= 22 ? 'night' : 'day');
+  }, [date, tariffOverride]);
+  const cfg = rates[tariff][tier],
+    chargeableMiles = Math.max(0, distance - 1),
+    distanceCharge = chargeableMiles * cfg.rate,
     fuelCost = fuel ? (distance * fuelRate) / 100 : 0,
     durationCharge = duration * waiting,
     total = fixed
       ? +fixed
-      : cfg.base + distanceCharge + fuelCost + durationCharge + airport;
+      : cfg.base + distanceCharge + fuelCost + durationCharge + airport + toll;
   const reset = () => {
     setDistance(0);
     setDuration(0);
     setWaiting(0);
     setAirport(0);
+    setToll(0);
     setFixed('');
     setPassenger('');
     setPhone('');
@@ -836,7 +864,8 @@ function Calculator({
     setLarge(0);
     setSmall(0);
     setTier('Saloon');
-    setModel('A');
+    setTariff('day');
+    setTariffOverride(false);
     setDoc('quote');
     setBookingType('CASH');
   };
@@ -854,7 +883,7 @@ function Calculator({
     fleetTier: tier,
     distance,
     fare: total,
-    notes: `${doc === 'quote' ? 'Official quote' : 'Booking confirmation'} · Fare Model ${model}`,
+    notes: `${doc === 'quote' ? 'Official quote' : 'Booking confirmation'} · ${tariff === 'day' ? 'Day' : 'Night / Holiday'} tariff`,
   };
   return (
     <Page
@@ -935,20 +964,21 @@ function Calculator({
                 value={tier}
                 onChange={(e) => setTier(e.target.value as keyof Rates)}
               >
-                {Object.keys(rates).map((x) => (
+                {Object.keys(rates[tariff]).map((x) => (
                   <option key={x}>{x}</option>
                 ))}
               </select>
             </label>
             <label>
-              Fare model
+              Tariff (Fare Model)
               <select
-                value={model}
-                onChange={(e) => setModel(e.target.value as 'A' | 'B')}
+                value={tariff}
+                onChange={(e) => { setTariff(e.target.value as Tariff); setTariffOverride(true); }}
               >
-                <option value="A">Model A · mileage from mile 1</option>
-                <option value="B">Model B · first mile included</option>
+                <option value="day">Day</option>
+                <option value="night">Night / Holiday</option>
               </select>
+              <small className="field-hint">Auto-selected from trip time; changing it keeps your manual override.</small>
             </label>
             <Field
               label="Journey / waiting hours"
@@ -966,6 +996,12 @@ function Calculator({
               label="Airport fee (£)"
               value={String(airport)}
               set={(v) => setAirport(+v)}
+              type="number"
+            />
+            <Field
+              label="Toll fee (£)"
+              value={String(toll)}
+              set={(v) => setToll(+v)}
               type="number"
             />
             <Field
@@ -1012,23 +1048,29 @@ function Calculator({
             <i>to</i>
             <b>TO: {dropoff || 'Not specified'}</b>
           </div>
-          <dl>
+          <dl className="operator-breakdown">
             <div>
               <dt>Passenger</dt>
               <dd>{passenger || '—'}</dd>
             </div>
             <div>
-              <dt>Journey date</dt>
-              <dd>{date ? fmtDate(date) : '—'}</dd>
+              <dt>Journey date & time</dt>
+              <dd>{date ? `${fmtDate(date)} · ${fmtTime(date)}` : '—'}</dd>
             </div>
             <div>
               <dt>Booking type</dt>
               <dd>{bookingType}</dd>
             </div>
             <div>
-              <dt>Vehicle specification</dt>
+              <dt>Fleet tier</dt>
               <dd>{tier}</dd>
             </div>
+            <div><dt>Base fare ({tariff === 'day' ? 'Day' : 'Night / Holiday'})</dt><dd>£{cfg.base.toFixed(2)}</dd></div>
+            <div><dt>Fare after first mile</dt><dd>£{distanceCharge.toFixed(2)}</dd></div>
+            <div><dt>Fuel expense</dt><dd>{fuel ? `£${fuelCost.toFixed(2)}` : 'Not included'}</dd></div>
+            <div><dt>Airport fee</dt><dd>£{airport.toFixed(2)}</dd></div>
+            <div><dt>Toll fee</dt><dd>£{toll.toFixed(2)}</dd></div>
+            <div><dt>Fare model</dt><dd>{tariff === 'day' ? 'Day' : 'Night / Holiday'}</dd></div>
           </dl>
           {doc === 'confirmation' && (
             <section className="schedule-block">
@@ -1065,7 +1107,7 @@ function Calculator({
               <X />
               Reset calculator
             </button>
-            <button onClick={() => window.print()}>
+            <button onClick={() => printCustomerDocument({ doc, passenger, date, pickup, dropoff, tier, airport, toll, tariff, total })}>
               <Printer />
               Generate {doc === 'quote' ? 'quote' : 'confirmation'} PDF
             </button>
@@ -1088,10 +1130,10 @@ function SettingsPage({
   persist,
 }: {
   operators: string[];
-  rates: Rates;
+  rates: TariffRates;
   fuelRate: number;
   timeFormat: '12' | '24';
-  persist: (o: string[], r: Rates, f: number, t?: '12' | '24') => void;
+  persist: (o: string[], r: TariffRates, f: number, t?: '12' | '24') => void;
 }) {
   const [tab, setTab] = useState<
       'templates' | 'operators' | 'rates' | 'clock' | 'security'
@@ -1184,10 +1226,12 @@ function SettingsPage({
       )}{' '}
       {tab === 'rates' && (
         <section className="panel">
-          <Head over="DEFAULT RATES" title="Fleet rate chart" />
-          <div className="rate-table">
-            {Object.entries(localRates).map(([n, v]) => (
-              <div key={n}>
+          <Head over="DEFAULT RATES" title="Day and Night / Holiday tariff chart" />
+          {(['day', 'night'] as Tariff[]).map((tariffName) => <div className="tariff-rate-group" key={tariffName}>
+            <h4>{tariffName === 'day' ? 'Day tariff' : 'Night / Holiday tariff'}</h4>
+            <div className="rate-table">
+            {Object.entries(localRates[tariffName]).map(([n, v]) => (
+              <div key={`${tariffName}-${n}`}>
                 <b>{n}</b>
                 <label>
                   Base £
@@ -1198,7 +1242,7 @@ function SettingsPage({
                     onChange={(e) =>
                       setLocalRates({
                         ...localRates,
-                        [n]: { ...v, base: +e.target.value },
+                        [tariffName]: { ...localRates[tariffName], [n]: { ...v, base: +e.target.value } },
                       })
                     }
                   />
@@ -1212,14 +1256,15 @@ function SettingsPage({
                     onChange={(e) =>
                       setLocalRates({
                         ...localRates,
-                        [n]: { ...v, rate: +e.target.value },
+                        [tariffName]: { ...localRates[tariffName], [n]: { ...v, rate: +e.target.value } },
                       })
                     }
                   />
                 </label>
               </div>
             ))}
-          </div>
+            </div>
+          </div>)}
           <label>
             Fuel cost per 100 miles
             <input
@@ -2354,4 +2399,26 @@ function vehicle(p: number, l: number, s: number) {
   if (p <= 4 && l <= 3 && s <= 3) return 'Estate';
   if (p <= 5 && l <= 4 && s <= 4) return '6-seater';
   return '7-seater';
+}
+
+function printCustomerDocument(input: {
+  doc: 'quote' | 'confirmation';
+  passenger: string;
+  date: string;
+  pickup: string;
+  dropoff: string;
+  tier: string;
+  airport: number;
+  toll: number;
+  tariff: Tariff;
+  total: number;
+}) {
+  const safe = (value: string) => value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character] || character);
+  const extra = input.airport + input.toll;
+  const title = input.doc === 'quote' ? 'Official Booking Quote' : 'Booking Confirmation';
+  const tripDate = input.date ? `${fmtDate(input.date)} at ${fmtTime(input.date)}` : 'Not specified';
+  const popup = window.open('', '_blank');
+  if (!popup) { alert('Please allow pop-ups to generate the customer PDF.'); return; }
+  popup.document.write(`<!doctype html><html><head><title>${safe(title)}</title><style>@page{size:A4;margin:18mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#222;margin:0}header{text-align:center;border-bottom:2px solid #bd9225;padding:14px 0 24px;margin-bottom:34px}header b{font-size:30px;letter-spacing:.16em}header span{display:block;margin-top:7px;font-size:11px;letter-spacing:.38em;color:#666}h1{font-size:18px;text-transform:uppercase;margin:0 0 24px}.row{display:grid;grid-template-columns:190px 1fr;padding:13px 0;border-bottom:1px solid #ddd}.row label{font-weight:bold;color:#555}.route div+div{margin-top:7px}.total{margin-top:32px;border-top:2px solid #bd9225;border-bottom:2px solid #bd9225;padding:20px 0;display:flex;justify-content:space-between;font-size:20px;font-weight:bold}.total strong{font-size:28px}footer{margin-top:36px;color:#666;font-size:11px}@media print{button{display:none}}</style></head><body><header><b>APX RIDE</b><span>ELEVATE EVERY MILE</span></header><h1>${safe(title)}</h1><div class="row"><label>Passenger</label><span>${safe(input.passenger || 'Not specified')}</span></div><div class="row"><label>Trip date &amp; time</label><span>${safe(tripDate)}</span></div><div class="row"><label>Pickup / Drop-off</label><span class="route"><div><b>Pickup:</b> ${safe(input.pickup || 'Not specified')}</div><div><b>Drop-off:</b> ${safe(input.dropoff || 'Not specified')}</div></span></div><div class="row"><label>Fleet tier</label><span>${safe(input.tier)}</span></div>${extra > 0 ? `<div class="row"><label>Airport / Toll fee</label><span>£${extra.toFixed(2)}</span></div>` : ''}<div class="row"><label>Fare model</label><span>${input.tariff === 'day' ? 'Day' : 'Night / Holiday'}</span></div><div class="total"><span>Total Amount</span><strong>£${input.total.toFixed(2)}</strong></div><footer>This client document excludes APX RIDE internal operating calculations.</footer><script>window.addEventListener('load',()=>window.print())<\/script></body></html>`);
+  popup.document.close();
 }
