@@ -739,7 +739,7 @@ function Bookings({
               <button onClick={() => view(b)} title="View details">
                 <Eye />
               </button>
-              {b.status === 'complete' && <button onClick={() => printTripInvoice(b)} title="Generate trip invoice"><FileText />Invoice</button>}
+              {b.status === 'complete' && <button className="invoice-action" onClick={() => printTripInvoice(b)} title="Generate trip invoice"><FileText /><span>Invoice</span></button>}
               {b.status !== 'complete' && <button onClick={() => edit(b)} title="Edit booking"><Pencil /></button>}
               {b.status === 'upcoming' && (
                 <button
