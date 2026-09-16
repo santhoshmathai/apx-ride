@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     const b = (await req.json()) as Record<string, unknown>;
     const now = new Date().toISOString();
     const result = await env.DB.prepare(
-      `INSERT INTO bookings(owner_id,passenger_name,phone,pickup,dropoff,pickup_at,operator,driver_call_sign,driver_name,driver_licence,booking_type,passengers,large_bags,small_bags,fleet_tier,distance,fare,status,notes,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO bookings(owner_id,passenger_name,phone,pickup,dropoff,pickup_at,operator,driver_call_sign,driver_name,driver_licence,booking_type,passengers,large_bags,small_bags,fleet_tier,distance,fare,base_fare,airport_fee,toll_fee,tariff,status,notes,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     )
       .bind(
         ownerId,
@@ -68,6 +68,10 @@ export async function POST(req: Request) {
         b.fleetTier || 'Saloon',
         b.distance || 0,
         b.fare || 0,
+        b.baseFare || 0,
+        b.airportFee || 0,
+        b.tollFee || 0,
+        b.tariff || 'day',
         b.status || 'upcoming',
         b.notes || '',
         now,
@@ -114,7 +118,7 @@ export async function PUT(req: Request) {
     await ready();
     const b = (await req.json()) as Record<string, unknown>;
     await env.DB.prepare(
-      `UPDATE bookings SET passenger_name=?,phone=?,pickup=?,dropoff=?,pickup_at=?,operator=?,driver_call_sign=?,driver_name=?,driver_licence=?,booking_type=?,passengers=?,large_bags=?,small_bags=?,fleet_tier=?,distance=?,fare=?,notes=?,updated_at=? WHERE id=? AND owner_id=?`,
+      `UPDATE bookings SET passenger_name=?,phone=?,pickup=?,dropoff=?,pickup_at=?,operator=?,driver_call_sign=?,driver_name=?,driver_licence=?,booking_type=?,passengers=?,large_bags=?,small_bags=?,fleet_tier=?,distance=?,fare=?,base_fare=?,airport_fee=?,toll_fee=?,tariff=?,notes=?,updated_at=? WHERE id=? AND owner_id=?`,
     )
       .bind(
         b.passengerName || 'Unnamed passenger',
@@ -133,6 +137,10 @@ export async function PUT(req: Request) {
         b.fleetTier || 'Saloon',
         b.distance || 0,
         b.fare || 0,
+        b.baseFare || 0,
+        b.airportFee || 0,
+        b.tollFee || 0,
+        b.tariff || 'day',
         b.notes || '',
         new Date().toISOString(),
         b.id,

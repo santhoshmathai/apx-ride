@@ -15,6 +15,7 @@ import {
   Mail,
   MessageSquareText,
   Menu,
+  Navigation,
   Pencil,
   Plus,
   Settings,
@@ -43,6 +44,10 @@ type Booking = {
   fleet_tier: string;
   distance: number;
   fare: number;
+  base_fare?: number;
+  airport_fee?: number;
+  toll_fee?: number;
+  tariff?: Tariff;
   status: string;
   notes: string;
   driver_call_sign?: string;
@@ -67,6 +72,12 @@ const defaultTariffRates: TariffRates = {
     '6-seater': { base: 10, rate: 2.75 },
     '7-seater': { base: 11, rate: 3.1 },
   },
+};
+type MessageTemplates = Record<'enroute' | 'arrived' | 'review', string>;
+const defaultMessageTemplates: MessageTemplates = {
+  enroute: 'Good day, {passenger}. Your APX RIDE chauffeur is en route for your transfer to {dropoff}. Driver: {driver}. Vehicle: {vehicle}.',
+  arrived: 'Good day, {passenger}. Your chauffeur has arrived at {pickup}.',
+  review: 'Dear {passenger}, thank you for choosing APX RIDE for your journey to {dropoff}.',
 };
 function normaliseRates(value: unknown): TariffRates {
   const input = value as Partial<TariffRates> & Partial<Rates> | null;
@@ -100,7 +111,8 @@ export function AppShell({ signOutPath }: { signOutPath: string }) {
   const [operators, setOperators] = useState<string[]>(['APX RIDE']),
     [rates, setRates] = useState<TariffRates>(defaultTariffRates),
     [fuelRate, setFuelRate] = useState(50),
-    [timeFormat, setTimeFormat] = useState<'12' | '24'>('24');
+    [timeFormat, setTimeFormat] = useState<'12' | '24'>('24'),
+    [messageTemplates, setMessageTemplates] = useState<MessageTemplates>(defaultMessageTemplates);
   useEffect(() => { activeTimeFormat = timeFormat; }, [timeFormat]);
   const refresh = () =>
     fetch('/api/bookings')
@@ -114,6 +126,8 @@ export function AppShell({ signOutPath }: { signOutPath: string }) {
       if (s.operators) setOperators(s.operators);
       if (s.rates) setRates(normaliseRates(s.rates));
       if (s.fuelRate !== undefined) setFuelRate(s.fuelRate);
+      const legacyTemplates = JSON.parse(localStorage.getItem('apx-message-templates') || 'null');
+      if (legacyTemplates) setMessageTemplates({ ...defaultMessageTemplates, ...legacyTemplates });
     } catch {}
     void Promise.all([
       refresh(),
@@ -123,10 +137,11 @@ export function AppShell({ signOutPath }: { signOutPath: string }) {
         if (server.rates_json && server.rates_json !== '{}') setRates(normaliseRates(JSON.parse(String(server.rates_json))));
         if (server.fuel_per_100 !== undefined) setFuelRate(Number(server.fuel_per_100));
         if (server.time_format === '12' || server.time_format === '24') setTimeFormat(server.time_format);
+        if (server.message_templates_json && server.message_templates_json !== '{}') setMessageTemplates({ ...defaultMessageTemplates, ...JSON.parse(String(server.message_templates_json)) });
       }),
     ]).finally(() => setLoading(false));
   }, []);
-  const persist = (o = operators, r = rates, f = fuelRate, t = timeFormat) => {
+  const persist = (o = operators, r = rates, f = fuelRate, t = timeFormat, m = messageTemplates) => {
     setOperators(o);
     setRates(r);
     setFuelRate(f);
@@ -135,7 +150,11 @@ export function AppShell({ signOutPath }: { signOutPath: string }) {
       'apx-settings',
       JSON.stringify({ operators: o, rates: r, fuelRate: f, timeFormat: t }),
     );
-    void fetch('/api/settings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ operators: o, rates: r, fuelRate: f, timeFormat: t }) });
+    void fetch('/api/settings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ operators: o, rates: r, fuelRate: f, timeFormat: t, messageTemplates: m }) });
+  };
+  const saveMessageTemplates = (templates: MessageTemplates) => {
+    setMessageTemplates(templates);
+    persist(operators, rates, fuelRate, timeFormat, templates);
   };
   const save = async (data: Record<string, unknown>, id?: number) => {
     await fetch('/api/bookings', {
@@ -224,6 +243,7 @@ export function AppShell({ signOutPath }: { signOutPath: string }) {
               view={setDetail}
               edit={setModal}
               add={() => setModal(null)}
+              messageTemplates={messageTemplates}
             />
           )}
           {active === 'Calculator' && (
@@ -235,7 +255,7 @@ export function AppShell({ signOutPath }: { signOutPath: string }) {
             />
           )}
           {active === 'Calendar' && <Calendar items={bookings} />}
-          {active === 'Messages' && <Messages items={bookings} />}
+          {active === 'Messages' && <Messages items={bookings} templates={messageTemplates} saveTemplates={saveMessageTemplates} />}
           {active === 'Records Hub' && <RecordsHub />}
           {active === 'Earnings' && <EarningsV2 items={bookings} status={status} />}
           {active === 'Settings' && (
@@ -333,9 +353,13 @@ function Dashboard({
   timeFormat: '12' | '24';
 }) {
   const upcoming = bookings
-      .filter((b) => b.status === 'upcoming' || b.status === 'in_progress')
+      .filter((b) => b.status === 'upcoming')
       .sort((a, b) => a.pickup_at.localeCompare(b.pickup_at)),
-    next = upcoming[0],
+    inProgress = bookings
+      .filter((b) => b.status === 'in_progress')
+      .sort((a, b) => a.pickup_at.localeCompare(b.pickup_at)),
+    next = inProgress[0] || upcoming[0],
+    following = inProgress.length ? upcoming[0] : upcoming[1],
     done = bookings.filter((b) => b.status === 'complete'),
     earn = done.reduce((a, b) => a + b.fare, 0);
   return (
@@ -349,7 +373,7 @@ function Dashboard({
               <p>Bookings, dispatch and quotes in one live workspace.</p>
             </div>
           </section>
-          <Dispatch next={next} following={upcoming[1]} go={go} />
+          <Dispatch next={next} following={following} go={go} />
         </div>
         <LiveClock go={() => go('Calendar')} timeFormat={timeFormat} />
       </div>
@@ -363,8 +387,8 @@ function Dashboard({
         <Stat
           icon={CircleGauge}
           label="Active jobs"
-          value={String(upcoming.length).padStart(2, '0')}
-          detail="Upcoming dispatches"
+          value={String(upcoming.length + inProgress.length).padStart(2, '0')}
+          detail="Open dispatches"
         />
         <Stat
           icon={CalendarDays}
@@ -406,12 +430,13 @@ function LiveClock({ go, timeFormat }: { go: () => void; timeFormat: '12' | '24'
   );
 }
 function Dispatch({ next, following, go }: { next?: Booking; following?: Booking; go: (s: string) => void }) {
+  const enRoute = next?.status === 'in_progress';
   return (
     <section className="panel dispatch">
-      <Head over="LIVE DISPATCH" title="Next journey" />
+      <Head over="LIVE DISPATCH" title={enRoute ? 'Journey en route' : 'Next journey'} />
       {next ? (
         <>
-          <span className="live">● Ready for dispatch</span>
+          <span className="live">● {enRoute ? 'En route' : 'Ready for dispatch'}</span>
           <div className="dispatch-strip">
             <b>{fmtDate(next.pickup_at)}</b>
             <strong>{fmtTime(next.pickup_at)}</strong>
@@ -426,6 +451,7 @@ function Dispatch({ next, following, go }: { next?: Booking; following?: Booking
               <p>
                 {next.passenger_name} · {next.passengers} passenger(s)
               </p>
+              {enRoute && <NavigateButton address={next.pickup} />}
               </div>
             </div>
             <div className="route-point">
@@ -434,6 +460,7 @@ function Dispatch({ next, following, go }: { next?: Booking; following?: Booking
               <small>DROP-OFF</small>
               <b>{next.dropoff}</b>
               <p>{next.notes || 'No dispatch notes'}</p>
+              {enRoute && <NavigateButton address={next.dropoff} />}
               </div>
             </div>
           </div>
@@ -460,6 +487,15 @@ function Dispatch({ next, following, go }: { next?: Booking; following?: Booking
       )}
     </section>
   );
+}
+
+function NavigateButton({ address }: { address: string }) {
+  const navigate = () => {
+    const destination = encodeURIComponent(address);
+    const appleDevice = /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent);
+    window.open(appleDevice ? `https://maps.apple.com/?daddr=${destination}&dirflg=d` : `https://www.google.com/maps/dir/?api=1&destination=${destination}`, '_blank', 'noopener,noreferrer');
+  };
+  return <button type="button" className="navigate-link" onClick={navigate} aria-label={`Navigate to ${address}`}><Navigation />Directions</button>;
 }
 
 function TodayJobs({ jobs, go }: { jobs: Booking[]; go: (page: string) => void }) {
@@ -624,6 +660,7 @@ function Bookings({
   view,
   edit,
   add,
+  messageTemplates,
 }: {
   items: Booking[];
   loading: boolean;
@@ -632,6 +669,7 @@ function Bookings({
   view: (b: Booking) => void;
   edit: (b: Booking) => void;
   add: () => void;
+  messageTemplates: MessageTemplates;
 }) {
   const [tab, setTab] = useState<'active' | 'progress' | 'complete'>('active');
   const [finishing, setFinishing] = useState<Booking | null>(null),
@@ -701,6 +739,7 @@ function Bookings({
               <button onClick={() => view(b)} title="View details">
                 <Eye />
               </button>
+              {b.status === 'complete' && <button onClick={() => printTripInvoice(b)} title="Generate trip invoice"><FileText />Invoice</button>}
               {b.status !== 'complete' && <button onClick={() => edit(b)} title="Edit booking"><Pencil /></button>}
               {b.status === 'upcoming' && (
                 <button
@@ -734,23 +773,26 @@ function Bookings({
           }}
         />
       )}
-      {messaging && <QuickMessage booking={messaging} close={() => setMessaging(null)} />}
+      {messaging && <QuickMessage booking={messaging} templates={messageTemplates} close={() => setMessaging(null)} />}
     </Page>
   );
 }
 
-function QuickMessage({ booking, close }: { booking: Booking; close: () => void }) {
-  const templates = {
-    'Vehicle En Route': `Hello ${booking.passenger_name}, your APX RIDE vehicle is en route to ${booking.pickup} for your journey to ${booking.dropoff}.`,
-    'Driver Arrived': `Hello ${booking.passenger_name}, your APX RIDE driver has arrived at ${booking.pickup}.`,
-    'Journey Complete': `Thank you ${booking.passenger_name}. Your APX RIDE journey to ${booking.dropoff} is complete.`,
-  };
-  const [message, setMessage] = useState(templates['Vehicle En Route']);
+function QuickMessage({ booking, templates, close }: { booking: Booking; templates: MessageTemplates; close: () => void }) {
+  const labels: Record<keyof MessageTemplates, string> = { enroute: 'Vehicle En Route', arrived: 'Driver Arrived', review: 'Journey Complete' };
+  const render = (template: string) => template
+    .replaceAll('{passenger}', booking.passenger_name)
+    .replaceAll('{pickup}', booking.pickup)
+    .replaceAll('{dropoff}', booking.dropoff)
+    .replaceAll('{driver}', booking.driver_name || 'your assigned driver')
+    .replaceAll('{vehicle}', booking.fleet_tier);
+  const [kind, setKind] = useState<keyof MessageTemplates>('enroute');
+  const [message, setMessage] = useState(render(templates.enroute));
   const openSms = async () => {
     await fetch('/api/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ bookingId: booking.id, channel: 'SMS', recipient: booking.phone, message }) });
     window.location.href = `sms:${booking.phone}?body=${encodeURIComponent(message)}`;
   };
-  return <div className="modal"><button className="scrim" onClick={close} /><section className="payment-card quick-message"><header><div><small>PASSENGER MESSAGE</small><h2>{booking.passenger_name}</h2></div><button onClick={close}><X /></button></header><label>Template<select onChange={(e) => setMessage(templates[e.target.value as keyof typeof templates])}>{Object.keys(templates).map((name) => <option key={name}>{name}</option>)}</select></label><label>Message<textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={5} /></label><footer><button onClick={() => navigator.clipboard.writeText(message)}><Copy />Copy</button><button className="primary sms-link" onClick={openSms}>Open SMS</button></footer></section></div>;
+  return <div className="modal"><button className="scrim" onClick={close} /><section className="payment-card quick-message"><header><div><small>PASSENGER MESSAGE</small><h2>{booking.passenger_name}</h2></div><button onClick={close}><X /></button></header><label>Template<select value={kind} onChange={(e) => { const selected = e.target.value as keyof MessageTemplates; setKind(selected); setMessage(render(templates[selected])); }}>{Object.keys(labels).map((key) => <option key={key} value={key}>{labels[key as keyof MessageTemplates]}</option>)}</select></label><label>Message<textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={5} /></label><footer><button onClick={() => navigator.clipboard.writeText(message)}><Copy />Copy</button><button className="primary sms-link" onClick={openSms}>Open SMS</button></footer></section></div>;
 }
 
 function PaymentModal({
@@ -882,6 +924,10 @@ function Calculator({
     fleetTier: tier,
     distance,
     fare: total,
+    baseFare: Math.max(0, total - airport - toll),
+    airportFee: airport,
+    tollFee: toll,
+    tariff,
     notes: `${doc === 'quote' ? 'Official quote' : 'Booking confirmation'} · ${tariff === 'day' ? 'Day' : 'Night / Holiday'} tariff`,
   };
   return (
@@ -1475,6 +1521,22 @@ function BookingModal({
               defaultValue={booking?.fare || 0}
             />
           </label>
+          <label>
+            Base journey fare (£)
+            <input name="baseFare" type="number" step="0.01" min="0" defaultValue={booking?.base_fare || booking?.fare || 0} />
+          </label>
+          <label>
+            Airport fee (£)
+            <input name="airportFee" type="number" step="0.01" min="0" defaultValue={booking?.airport_fee || 0} />
+          </label>
+          <label>
+            Toll fee (£)
+            <input name="tollFee" type="number" step="0.01" min="0" defaultValue={booking?.toll_fee || 0} />
+          </label>
+          <label>
+            Tariff
+            <select name="tariff" defaultValue={booking?.tariff || 'day'}><option value="day">Day</option><option value="night">Night / Holiday</option></select>
+          </label>
           <label className="wide">
             Notes
             <textarea name="notes" rows={3} defaultValue={booking?.notes} />
@@ -1714,14 +1776,7 @@ function AvailabilityModal({ day, close, saved }: { day: string; close: () => vo
   const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const data = Object.fromEntries(new FormData(event.currentTarget)); const response = await fetch('/api/availability', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ date: data.date, fullDay, startTime: data.startTime || '', endTime: data.endTime || '', reason: data.reason || '' }) }); if (response.ok) saved(); else alert('Availability could not be saved.'); };
   return <div className="modal"><button className="scrim" onClick={close} /><form className="payment-card" onSubmit={submit}><header><div><small>DISPATCH AVAILABILITY</small><h2>Add unavailable period</h2></div><button type="button" onClick={close}><X /></button></header><label>Date<input name="date" type="date" defaultValue={day} required /></label><label className="check-label"><input type="checkbox" checked={fullDay} onChange={(e) => setFullDay(e.target.checked)} />Full day</label>{!fullDay && <div className="form-grid"><label>Start time<input name="startTime" type="time" required /></label><label>End time<input name="endTime" type="time" required /></label></div>}<label>Reason<input name="reason" placeholder="Holiday, appointment, vehicle maintenance…" required /></label><footer><button type="button" onClick={close}>Cancel</button><button className="primary"><Save />Save unavailable period</button></footer></form></div>;
 }
-function Messages({ items }: { items: Booking[] }) {
-  const defaults = {
-    enroute:
-      'Good day, {passenger}. Your APX RIDE chauffeur is en route for your transfer to {dropoff}. Driver: {driver}. Vehicle: {vehicle}.',
-    arrived: 'Good day, {passenger}. Your chauffeur has arrived at {pickup}.',
-    review:
-      'Dear {passenger}, thank you for choosing APX RIDE for your journey to {dropoff}.',
-  };
+function Messages({ items, templates, saveTemplates }: { items: Booking[]; templates: MessageTemplates; saveTemplates: (templates: MessageTemplates) => void }) {
   const messageJobs = items.filter(
     (x) =>
       x.status !== 'complete' &&
@@ -1729,22 +1784,11 @@ function Messages({ items }: { items: Booking[] }) {
       new Date(x.pickup_at) >= new Date(Date.now() - 86400000),
   );
   const [selected, setSelected] = useState(messageJobs[0]?.id),
-    [kind, setKind] = useState<keyof typeof defaults>('enroute'),
-    [templates, setTemplates] = useState(defaults),
-    [draft, setDraft] = useState(defaults.enroute),
+    [kind, setKind] = useState<keyof MessageTemplates>('enroute'),
+    [draft, setDraft] = useState(templates.enroute),
     b = messageJobs.find((x) => x.id === selected) || messageJobs[0];
-  useEffect(() => {
-    try {
-      const t = JSON.parse(
-        localStorage.getItem('apx-message-templates') || 'null',
-      );
-      if (t) {
-        setTemplates(t);
-        setDraft(t[kind]);
-      }
-    } catch {}
-  }, []);
-  const choose = (k: keyof typeof defaults) => {
+  useEffect(() => setDraft(templates[kind]), [templates, kind]);
+  const choose = (k: keyof MessageTemplates) => {
     setKind(k);
     setDraft(templates[k]);
   };
@@ -1758,8 +1802,7 @@ function Messages({ items }: { items: Booking[] }) {
     : draft;
   const saveTemplate = () => {
     const t = { ...templates, [kind]: draft };
-    setTemplates(t);
-    localStorage.setItem('apx-message-templates', JSON.stringify(t));
+    saveTemplates(t);
   };
   return (
     <Page
@@ -1785,7 +1828,7 @@ function Messages({ items }: { items: Booking[] }) {
             Template
             <select
               value={kind}
-              onChange={(e) => choose(e.target.value as keyof typeof defaults)}
+              onChange={(e) => choose(e.target.value as keyof MessageTemplates)}
             >
               <option value="enroute">Vehicle en route</option>
               <option value="arrived">Driver arrived</option>
@@ -2446,6 +2489,23 @@ function easterSunday(year: number) {
   const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
   const month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1;
   return new Date(year, month - 1, day);
+}
+
+function printTripInvoice(booking: Booking) {
+  const safe = (value: string) => value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character] || character);
+  const airport = Number(booking.airport_fee || 0);
+  const toll = Number(booking.toll_fee || 0);
+  const base = Number(booking.base_fare || 0) > 0 ? Number(booking.base_fare) : Math.max(0, booking.fare - airport - toll);
+  const rows: Array<[string, number]> = [
+    ['Base fare', base],
+    ...(airport > 0 ? [['Airport fee', airport] as [string, number]] : []),
+    ...(toll > 0 ? [['Toll fee', toll] as [string, number]] : []),
+  ];
+  const popup = window.open('', '_blank');
+  if (!popup) { alert('Please allow pop-ups to generate the trip invoice.'); return; }
+  const invoiceNumber = `APX-INV-${String(booking.id).padStart(5, '0')}`;
+  popup.document.write(`<!doctype html><html><head><title>${invoiceNumber}</title><style>@page{size:A4;margin:18mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#222;margin:0}header{text-align:center;border-bottom:2px solid #bd9225;padding:14px 0 24px;margin-bottom:30px}header b{font-size:30px;letter-spacing:.16em}header span{display:block;margin-top:7px;font-size:11px;letter-spacing:.38em;color:#666}h1{font-size:20px;text-transform:uppercase;margin:0 0 22px}.client{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;padding:18px;border:1px solid #ddd;margin-bottom:26px}.client small,.route small{display:block;color:#666;text-transform:uppercase;font-size:10px;letter-spacing:.12em;margin-bottom:6px}.client b{font-size:15px}.route{padding:18px 0;border-top:1px solid #ddd;border-bottom:1px solid #ddd;margin-bottom:24px}.route div+div{margin-top:14px}.route b{display:block;font-size:15px}.charges{width:100%;border-collapse:collapse}.charges th,.charges td{text-align:left;padding:13px 8px;border-bottom:1px solid #ddd}.charges th:last-child,.charges td:last-child{text-align:right}.subtotal{margin-top:18px;border-top:2px solid #bd9225;border-bottom:2px solid #bd9225;padding:18px 8px;display:flex;justify-content:space-between;font-size:20px;font-weight:bold}footer{margin-top:32px;color:#666;font-size:11px}@media print{button{display:none}}</style></head><body><header><b>APX RIDE</b><span>ELEVATE EVERY MILE</span></header><h1>Trip Invoice</h1><section class="client"><div><small>Passenger Name</small><b>${safe(booking.passenger_name)}</b></div><div><small>Invoice #</small><b>${invoiceNumber}</b></div><div><small>Invoice Date</small><b>${new Date().toLocaleDateString('en-GB')}</b></div></section><section class="route"><div><small>Pickup</small><b>${safe(booking.pickup)}</b></div><div><small>Drop-off</small><b>${safe(booking.dropoff)}</b></div><div><small>Journey</small><b>${safe(fmtDate(booking.pickup_at))} · ${safe(fmtTime(booking.pickup_at))} · ${safe(booking.fleet_tier)}</b></div></section><table class="charges"><thead><tr><th>Completed journey charges</th><th>Amount</th></tr></thead><tbody>${rows.map(([label, amount]) => `<tr><td>${label}</td><td>£${amount.toFixed(2)}</td></tr>`).join('')}</tbody></table><div class="subtotal"><span>Sub Total</span><strong>£${booking.fare.toFixed(2)}</strong></div><footer>Invoice reference ${invoiceNumber} · Booking APX-${String(booking.id).padStart(5, '0')}</footer><script>window.addEventListener('load',()=>window.print())<\/script></body></html>`);
+  popup.document.close();
 }
 
 function printCustomerDocument(input: {

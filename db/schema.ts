@@ -20,6 +20,10 @@ export const bookings = sqliteTable('bookings', {
   fleetTier: text('fleet_tier').notNull().default('Saloon'),
   distance: real('distance').notNull().default(0),
   fare: real('fare').notNull().default(0),
+  baseFare: real('base_fare').notNull().default(0),
+  airportFee: real('airport_fee').notNull().default(0),
+  tollFee: real('toll_fee').notNull().default(0),
+  tariff: text('tariff').notNull().default('day'),
   status: text('status').notNull().default('upcoming'),
   notes: text('notes').notNull().default(''),
   createdAt: text('created_at').notNull(),
@@ -36,6 +40,7 @@ export const settings = sqliteTable('settings', {
   operatorsJson: text('operators_json').notNull().default('["APX RIDE"]'),
   ratesJson: text('rates_json').notNull().default('{}'),
   timeFormat: text('time_format').notNull().default('24'),
+  messageTemplatesJson: text('message_templates_json').notNull().default('{}'),
   updatedAt: text('updated_at').notNull(),
 });
 export const expenses = sqliteTable('expenses', {
