@@ -1088,6 +1088,7 @@ label textarea {
   grid-template-columns: repeat(7, 1fr);
   gap: 7px;
 }
+.calendar-month-toolbar{display:grid;grid-template-columns:auto minmax(180px,1fr) auto auto;align-items:center;gap:10px;margin:18px 0 12px}.calendar-month-toolbar h3{margin:0;text-align:center;font-size:1rem;letter-spacing:.03em}.calendar-month-toolbar button{min-height:40px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 12px;border:1px solid #80661f;border-radius:8px;background:#17191b;color:#e7bd45;font-weight:800}.calendar-month-toolbar button:hover{background:#2d250f}.calendar-month-toolbar svg{width:16px}.calendar-month-toolbar .calendar-today{color:#eee;border-color:#424548}.month-grid>button.outside-month{opacity:.42}
 .month-grid > b {
   text-align: center;
   color: #777;
@@ -1122,6 +1123,7 @@ label textarea {
   background: #2a1719;
   border-color: #663036;
 }
+.record-upload-hint{display:block;margin-top:7px;color:#8b8e90;font-size:.65rem;font-weight:500}.record-documents span em{display:block;margin-bottom:4px;color:#e7bd45;font-size:.58rem;font-style:normal;font-weight:900;letter-spacing:.05em;text-transform:uppercase}
 .message-grid textarea {
   display: block;
   width: 100%;
@@ -1229,6 +1231,7 @@ label textarea {
   margin-top: 20px;
 }
 @media (max-width: 800px) {
+  .calendar-month-toolbar{grid-template-columns:1fr 1fr}.calendar-month-toolbar h3{grid-column:1/-1;grid-row:1}.calendar-month-toolbar .calendar-today{grid-column:1/-1;grid-row:3}
   .month-grid {
     gap: 3px;
   }

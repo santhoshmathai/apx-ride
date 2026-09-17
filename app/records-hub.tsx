@@ -15,7 +15,7 @@ type RecordRow = {
   updated_at: string;
 };
 
-type Field = { name: string; label: string; type?: string; required?: boolean; options?: string[] };
+type Field = { name: string; label: string; type?: string; required?: boolean; options?: string[]; multiple?: boolean };
 type DocumentMeta = { id: number; field_name: string; file_name: string; content_type: string; uploaded_at: string };
 const schemas: Record<string, { label: string; singular: string; fields: Field[]; statuses: string[] }> = {
   roster: {
@@ -30,7 +30,8 @@ const schemas: Record<string, { label: string; singular: string; fields: Field[]
       { name: 'dbsDate', label: 'DBS check date', type: 'date' },
       { name: 'address', label: 'Current address', required: true },
       { name: 'engagementDate', label: 'Engagement start date', type: 'date' },
-      { name: 'licenceDocument', label: 'Licence document reference / secure link' },
+      { name: 'licenceDocument', label: 'Existing driver document reference / secure link (optional)' },
+      { name: 'driverDocuments', label: 'Driver documents (DVLA licence, PHV driver licence, address proof)', type: 'file', multiple: true },
       { name: 'vrm', label: 'Vehicle registration', required: true },
       { name: 'makeModelColour', label: 'Make, model and colour', required: true },
       { name: 'fleetTier', label: 'Fleet tier', required: true },
@@ -41,7 +42,8 @@ const schemas: Record<string, { label: string; singular: string; fields: Field[]
       { name: 'motExpiry', label: 'MOT expiry', type: 'date', required: true },
       { name: 'insuranceExpiry', label: 'Insurance expiry', type: 'date', required: true },
       { name: 'phvExpiry', label: 'Private hire vehicle licence expiry', type: 'date', required: true },
-      { name: 'documents', label: 'MOT, insurance and PHV document references' },
+      { name: 'documents', label: 'Existing vehicle document references (optional)' },
+      { name: 'vehicleDocuments', label: 'Vehicle documents (MOT, insurance, council PHV licence, V5 logbook)', type: 'file', multiple: true },
     ],
   },
   lost_property: {
@@ -125,7 +127,7 @@ function Register({ type }: { type: string }) {
           const data = JSON.parse(row.data_json || '{}') as Record<string, string>;
           return <details key={row.id} className={`compliance-row ${type === 'roster' ? 'roster-row' : ''}`}>
             <summary>{type === 'roster' ? <RosterSummary data={data} row={row} /> : <div className="record-summary-main"><b>{primaryValue(type, data, row.reference)}</b><span>{row.reference} · {row.event_date}</span></div>}<div className="summary-actions"><span className={`retention-badge ${expiryState(data)}`}>{expiryState(data).replace('_', ' ')}</span><span className={`status-badge ${statusClass(row.status)}`}>{row.status}</span><button onClick={(event) => { event.preventDefault(); setEditing(row); }}>Edit</button><ChevronDown className="accordion-arrow" /></div></summary>
-            {type === 'roster' ? <RosterDetails data={data} row={row} edit={() => setEditing(row)} /> : <><div className="expanded-status"><span className={`status-badge ${statusClass(row.status)}`}>{row.status}</span></div><dl className={type === 'complaint' ? 'complaint-details' : ''}>{schema.fields.filter((field) => field.type !== 'file').map((field) => <div key={field.name}><dt>{field.label}</dt><dd>{data[field.name] || '—'}</dd></div>)}<div><dt>Protected until at least</dt><dd>{row.retention_until}</dd></div><div><dt>Last updated</dt><dd>{new Date(row.updated_at).toLocaleString('en-GB')}</dd></div></dl><RecordDocuments recordId={row.id} /></>}
+            {type === 'roster' ? <><RosterDetails data={data} row={row} edit={() => setEditing(row)} /><RecordDocuments recordId={row.id} /></> : <><div className="expanded-status"><span className={`status-badge ${statusClass(row.status)}`}>{row.status}</span></div><dl className={type === 'complaint' ? 'complaint-details' : ''}>{schema.fields.filter((field) => field.type !== 'file').map((field) => <div key={field.name}><dt>{field.label}</dt><dd>{data[field.name] || '—'}</dd></div>)}<div><dt>Protected until at least</dt><dd>{row.retention_until}</dd></div><div><dt>Last updated</dt><dd>{new Date(row.updated_at).toLocaleString('en-GB')}</dd></div></dl><RecordDocuments recordId={row.id} /></>}
           </details>;
         })}
         {!filtered.length && <p className="empty-register">No {schema.label.toLowerCase()} records logged.</p>}
@@ -139,19 +141,21 @@ function RecordModal({ schema, type, row, close, saved }: { schema: (typeof sche
   const data = row ? JSON.parse(row.data_json || '{}') : {};
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); const raw = new FormData(event.currentTarget); const form = Object.fromEntries(raw);
+    const attachments = schema.fields.filter((field) => field.type === 'file').flatMap((field) => raw.getAll(field.name).filter((item): item is File => item instanceof File && item.size > 0).map((file) => ({ field, file })));
+    const oversized = attachments.find(({ file }) => file.size > 1_000_000);
+    if (oversized) { alert(`${oversized.file.name} is larger than 1 MB. Please choose a smaller PDF, JPG or PNG file.`); return; }
     const payload = { id: row?.id, recordType: type, reference: form.reference, eventDate: form.eventDate, status: form.status, data: Object.fromEntries(schema.fields.filter((field) => field.type !== 'file').map((field) => [field.name, form[field.name]])) };
     const response = await fetch('/api/records', { method: row ? 'PUT' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
     if (!response.ok) { alert('The record could not be saved. Please try again.'); return; }
     const result = await response.json() as { id?: number | string };
     const recordId = result.id || row?.id;
-    for (const field of schema.fields.filter((item) => item.type === 'file')) {
-      const proof = raw.get(field.name);
-      if (proof instanceof File && proof.size && recordId) { const upload = new FormData(); upload.set('file', proof); upload.set('recordId', String(recordId)); upload.set('fieldName', field.name); const uploaded = await fetch('/api/documents', { method: 'POST', body: upload }); if (!uploaded.ok) { alert(`The record was saved, but ${field.label.toLowerCase()} could not be uploaded.`); return; } }
+    for (const { field, file } of attachments) {
+      if (recordId) { const upload = new FormData(); upload.set('file', file); upload.set('recordId', String(recordId)); upload.set('fieldName', field.name); const uploaded = await fetch('/api/documents', { method: 'POST', body: upload }); if (!uploaded.ok) { const problem = await uploaded.json().catch(() => ({})) as { error?: string }; alert(`The record was saved, but ${file.name} could not be uploaded. ${problem.error || ''}`.trim()); return; } }
     }
     saved();
   };
   const statuses = row && !schema.statuses.includes(row.status) ? [row.status, ...schema.statuses] : schema.statuses;
-  return <div className="modal"><button className="scrim" aria-label="Close record form" onClick={close} /><form className={`record-modal ${type === 'complaint' ? 'complaint-modal' : ''}`} onSubmit={submit}><header><div><small>COMPLIANCE RECORD</small><h2>{row ? 'Edit' : 'Add'} {schema.singular}</h2></div><button type="button" aria-label="Close record form" onClick={close}><X /></button></header><div className="record-form-grid"><label>Reference<input name="reference" defaultValue={row?.reference || ''} placeholder="Generated if left blank" /></label><label>Record date<input name="eventDate" type="date" required defaultValue={row?.event_date || new Date().toISOString().slice(0, 10)} /></label><label>Status<select name="status" defaultValue={row?.status || statuses[0]}>{statuses.map((status) => <option key={status}>{status}</option>)}</select></label>{schema.fields.map((field) => <label key={field.name} className={field.type === 'textarea' ? 'record-field-wide' : ''}>{field.label}{field.options ? <select name={field.name} required={field.required} defaultValue={data[field.name] || field.options[0]}>{field.options.map((option) => <option key={option}>{option}</option>)}</select> : field.type === 'textarea' ? <textarea name={field.name} required={field.required} defaultValue={data[field.name] || ''} rows={6} /> : <input name={field.name} type={field.type || 'text'} accept={field.type === 'file' ? '.pdf,.jpg,.jpeg,.png' : undefined} required={field.required} defaultValue={field.type === 'file' ? undefined : data[field.name] || ''} />}</label>)}</div>{row && <RecordDocuments recordId={row.id} />}<p className="retention-note">This record is retained for at least 12 months. Every change creates a preserved revision; deletion is disabled.</p><footer><button type="button" onClick={close}>Cancel</button><button className="primary"><Save />Save revision</button></footer></form></div>;
+  return <div className="modal"><button className="scrim" aria-label="Close record form" onClick={close} /><form className={`record-modal ${type === 'complaint' ? 'complaint-modal' : ''}`} onSubmit={submit}><header><div><small>COMPLIANCE RECORD</small><h2>{row ? 'Edit' : 'Add'} {schema.singular}</h2></div><button type="button" aria-label="Close record form" onClick={close}><X /></button></header><div className="record-form-grid"><label>Reference<input name="reference" defaultValue={row?.reference || ''} placeholder="Generated if left blank" /></label><label>Record date<input name="eventDate" type="date" required defaultValue={row?.event_date || new Date().toISOString().slice(0, 10)} /></label><label>Status<select name="status" defaultValue={row?.status || statuses[0]}>{statuses.map((status) => <option key={status}>{status}</option>)}</select></label>{schema.fields.map((field) => <label key={field.name} className={field.type === 'textarea' || field.type === 'file' ? 'record-field-wide' : ''}>{field.label}{field.options ? <select name={field.name} required={field.required} defaultValue={data[field.name] || field.options[0]}>{field.options.map((option) => <option key={option}>{option}</option>)}</select> : field.type === 'textarea' ? <textarea name={field.name} required={field.required} defaultValue={data[field.name] || ''} rows={6} /> : <><input name={field.name} type={field.type || 'text'} accept={field.type === 'file' ? '.pdf,.jpg,.jpeg,.png' : undefined} multiple={field.type === 'file' && field.multiple} required={field.required} defaultValue={field.type === 'file' ? undefined : data[field.name] || ''} />{field.type === 'file' && <small className="record-upload-hint">PDF, JPG or PNG · maximum 1 MB per file{field.multiple ? ' · multiple files allowed' : ''}</small>}</>}</label>)}</div>{row && <RecordDocuments recordId={row.id} />}<p className="retention-note">This record is retained for at least 12 months. Every change creates a preserved revision; deletion is disabled.</p><footer><button type="button" onClick={close}>Cancel</button><button className="primary"><Save />Save revision</button></footer></form></div>;
 }
 
 function RosterSummary({ data, row }: { data: Record<string, string>; row: RecordRow }) {
@@ -169,7 +173,8 @@ function RecordDocuments({ recordId }: { recordId: number }) {
   const [documents, setDocuments] = useState<DocumentMeta[]>([]);
   useEffect(() => { void fetch(`/api/documents?recordId=${recordId}`).then((response) => response.ok ? response.json() : []).then((items) => setDocuments(Array.isArray(items) ? items : [])); }, [recordId]);
   if (!documents.length) return null;
-  return <section className="record-documents"><h4>ATTACHED DOCUMENTS</h4><div>{documents.map((document) => <a key={document.id} href={`/api/documents?id=${document.id}&preview=1`} target="_blank" rel="noreferrer">{document.content_type.startsWith('image/') ? <img src={`/api/documents?id=${document.id}&preview=1`} alt="" /> : <FileDown />}<span>{document.file_name}<small>View or download</small></span></a>)}</div></section>;
+  const labels: Record<string, string> = { driverDocuments: 'Driver document', vehicleDocuments: 'Vehicle document', returnEvidence: 'Return evidence', proofFile: 'Supporting document' };
+  return <section className="record-documents"><h4>ATTACHED DOCUMENTS</h4><div>{documents.map((document) => <a key={document.id} href={`/api/documents?id=${document.id}&preview=1`} target="_blank" rel="noreferrer">{document.content_type.startsWith('image/') ? <img src={`/api/documents?id=${document.id}&preview=1`} alt="" /> : <FileDown />}<span><em>{labels[document.field_name] || 'Document'}</em>{document.file_name}<small>View or download</small></span></a>)}</div></section>;
 }
 
 function primaryValue(type: string, data: Record<string, string>, fallback: string) {

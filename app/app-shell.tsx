@@ -4,6 +4,8 @@ import {
   CalendarDays,
   CarFront,
   Check,
+  ChevronLeft,
+  ChevronRight,
   CircleGauge,
   Copy,
   Download,
@@ -1636,7 +1638,8 @@ function Calendar({ items }: { items: Booking[] }) {
   const [tab, setTab] = useState<'list' | 'calendar'>('list'),
     [periods, setPeriods] = useState<Array<{ id: number; unavailable_date: string; full_day: number; start_time: string; end_time: string; reason: string }>>([]),
     [marking, setMarking] = useState(false),
-    [day, setDay] = useState(new Date().toISOString().slice(0, 10));
+    [day, setDay] = useState(new Date().toISOString().slice(0, 10)),
+    [visibleMonth, setVisibleMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1, 12));
   const refreshAvailability = () => fetch('/api/availability').then((r) => r.json()).then((d) => Array.isArray(d) && setPeriods(d));
   useEffect(() => { void refreshAvailability(); }, []);
   const jobs = items
@@ -1644,13 +1647,15 @@ function Calendar({ items }: { items: Booking[] }) {
     .sort((a, b) => a.pickup_at.localeCompare(b.pickup_at));
   const unavailable = (d: string) => periods.find((period) => period.unavailable_date === d);
   const removeUnavailable = async (id: number) => { if (!confirm('Remove this unavailable period?')) return; await fetch(`/api/availability?id=${id}`, { method: 'DELETE' }); void refreshAvailability(); };
-  const month = Array.from({ length: 35 }, (_, i) => {
-    const d = new Date();
-    d.setDate(1);
+  const month = Array.from({ length: 42 }, (_, i) => {
+    const d = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1, 12);
     const offset = (d.getDay() + 6) % 7;
     d.setDate(i - offset + 1);
     return d;
   });
+  const monthLabel = visibleMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const moveMonth = (amount: number) => setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + amount, 1, 12));
+  const showCurrentMonth = () => { const now = new Date(); setVisibleMonth(new Date(now.getFullYear(), now.getMonth(), 1, 12)); };
   return (
     <Page
       title="Dispatch calendar"
@@ -1717,6 +1722,12 @@ function Calendar({ items }: { items: Booking[] }) {
               </button>
             </div>
           </section>
+          <nav className="calendar-month-toolbar" aria-label="Calendar month navigation">
+            <button type="button" onClick={() => moveMonth(-1)} aria-label="Show previous month"><ChevronLeft />Previous</button>
+            <h3 aria-live="polite">{monthLabel}</h3>
+            <button type="button" className="calendar-today" onClick={showCurrentMonth}>Today</button>
+            <button type="button" onClick={() => moveMonth(1)} aria-label="Show next month">Next<ChevronRight /></button>
+          </nav>
           <div className="month-grid">
             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((x) => (
               <b key={x}>{x}</b>
@@ -1729,7 +1740,7 @@ function Calendar({ items }: { items: Booking[] }) {
               return (
                 <button
                   key={i}
-                  className={unavailable(key) ? 'unavailable' : ''}
+                  className={`${unavailable(key) ? 'unavailable' : ''} ${d.getMonth() !== visibleMonth.getMonth() ? 'outside-month' : ''}`.trim()}
                   onClick={() => { const period = unavailable(key); if (period) void removeUnavailable(period.id); else { setDay(key); setMarking(true); } }}
                 >
                   <span>{d.getDate()}</span>
