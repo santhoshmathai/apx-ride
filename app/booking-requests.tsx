@@ -1,0 +1,87 @@
+'use client';
+
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { Check, Clock3, FileQuestion, Mail, MessageSquareText, Phone, Plus, Search, X } from 'lucide-react';
+
+type BookingRequest = {
+  id: number; reference: string; passenger_name: string; email: string; phone: string; pickup: string; dropoff: string; pickup_at: string; passengers: number; large_bags: number; small_bags: number; fleet_tier: string; quoted_fare: number; notes: string; source: string; status: string; decision_reason: string; assigned_booking_id?: number | null; created_at: string;
+};
+type Summary = { requests: BookingRequest[]; organisation?: { name: string; owner_email: string }; publicBookingsEnabled: boolean; preparedNotifications: number };
+type Notification = { id: number; recipient: string; template_key: string; subject: string; status: string; created_at: string; sent_at: string; last_error: string };
+type Templates = { acknowledgement_template: string; confirmation_template: string; unavailable_template: string; cancellation_template: string };
+type RequestSummary = Summary & { notifications?: Notification[]; notificationTemplates?: Templates };
+type Decision = { request: BookingRequest; action: 'ACCEPT' | 'MORE_INFO' | 'UNAVAILABLE' | 'DECLINE' | 'CANCEL' };
+
+const statusLabels: Record<string, string> = { RECEIVED: 'New request', UNDER_REVIEW: 'Under review', MORE_INFORMATION_REQUIRED: 'More information required', ACCEPTED: 'Accepted', DRIVER_UNAVAILABLE: 'Driver unavailable', DECLINED: 'Declined', CUSTOMER_CANCELLED: 'Cancelled' };
+
+export function BookingRequests({ bookingSaved }: { bookingSaved: () => void }) {
+  const [data, setData] = useState<RequestSummary>({ requests: [], publicBookingsEnabled: false, preparedNotifications: 0 });
+  const [tab, setTab] = useState<'open' | 'accepted' | 'closed'>('open');
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [decision, setDecision] = useState<Decision | null>(null);
+  const [showTemplates, setShowTemplates] = useState(false), [showNotifications, setShowNotifications] = useState(false);
+  const refresh = useCallback(() => fetch('/api/booking-requests').then((response) => response.json()).then((result: unknown) => { const summary = result as RequestSummary; if (Array.isArray(summary.requests)) setData(summary); }).finally(() => setLoading(false)), []);
+  useEffect(() => { void refresh(); }, [refresh]);
+  const groups = useMemo(() => ({
+    open: data.requests.filter((item) => ['RECEIVED', 'UNDER_REVIEW', 'MORE_INFORMATION_REQUIRED'].includes(item.status)),
+    accepted: data.requests.filter((item) => item.status === 'ACCEPTED'),
+    closed: data.requests.filter((item) => ['DRIVER_UNAVAILABLE', 'DECLINED', 'CUSTOMER_CANCELLED'].includes(item.status)),
+  }), [data.requests]);
+  const shown = groups[tab].filter((item) => `${item.reference} ${item.passenger_name} ${item.pickup} ${item.dropoff} ${item.email}`.toLowerCase().includes(query.toLowerCase()));
+  const update = async (payload: Record<string, unknown>) => {
+    const response = await fetch('/api/booking-requests', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+    const result = await response.json() as { error?: string };
+    if (!response.ok) { alert(result.error || 'The request could not be updated.'); return false; }
+    await refresh(); bookingSaved(); return true;
+  };
+  const markReview = async (request: BookingRequest) => { await update({ id: request.id, action: 'REVIEW' }); };
+  return <section className="booking-requests-page">
+    <section className="page-head request-page-head"><div><small>PUBLIC BOOKING INTAKE</small><h2>Booking requests</h2><p>Review every enquiry before it becomes a confirmed dispatch.</p></div><button className="primary" onClick={() => setAdding(true)}><Plus />Add request</button></section>
+    <div className="request-summary-grid">
+      <article><Clock3 /><span>Awaiting action</span><b>{groups.open.length}</b><small>New or under review</small></article>
+      <article><Check /><span>Accepted</span><b>{groups.accepted.length}</b><small>Converted to bookings</small></article>
+      <article><Mail /><span>Prepared emails</span><b>{data.preparedNotifications}</b><small>Ready for Phase 2 delivery</small></article>
+      <article><FileQuestion /><span>Public intake</span><b>{data.publicBookingsEnabled ? 'ON' : 'OFF'}</b><small>{data.publicBookingsEnabled ? 'Website requests enabled' : 'Enabled with public website'}</small></article>
+    </div>
+    <div className="request-secondary-actions"><button onClick={() => setShowTemplates(!showTemplates)}><Mail />{showTemplates ? 'Hide' : 'Edit'} email templates</button><button onClick={() => setShowNotifications(!showNotifications)}><Clock3 />{showNotifications ? 'Hide' : 'View'} notification history</button></div>
+    {showTemplates && data.notificationTemplates && <TemplateEditor templates={data.notificationTemplates} saved={() => void refresh()} />}
+    {showNotifications && <NotificationHistory notifications={data.notifications || []} />}
+    <section className="panel request-register">
+      <header className="request-tools"><div className="view-tabs"><button className={tab === 'open' ? 'active' : ''} onClick={() => setTab('open')}>Action required ({groups.open.length})</button><button className={tab === 'accepted' ? 'active' : ''} onClick={() => setTab('accepted')}>Accepted ({groups.accepted.length})</button><button className={tab === 'closed' ? 'active' : ''} onClick={() => setTab('closed')}>Closed ({groups.closed.length})</button></div><label><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search requests" /></label></header>
+      {loading && <p className="request-empty">Loading booking requests…</p>}
+      {!loading && !shown.length && <p className="request-empty">No booking requests in this view.</p>}
+      <div className="request-list">{shown.map((request) => <article className="request-card" key={request.id}>
+        <header><div><small>{request.reference} · {request.source}</small><h3>{request.pickup} <span>→</span> {request.dropoff}</h3><p>{new Date(request.pickup_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</p></div><span className={`request-status ${request.status.toLowerCase()}`}>{statusLabels[request.status] || request.status}</span></header>
+        <div className="request-facts"><div><span>Passenger</span><b>{request.passenger_name}</b><small>{request.passengers} passenger{request.passengers === 1 ? '' : 's'} · {request.large_bags} large / {request.small_bags} small bags</small></div><div><span>Contact</span><b>{request.email}</b><small>{request.phone}</small></div><div><span>Vehicle and estimate</span><b>{request.fleet_tier}</b><small>{request.quoted_fare ? `£${Number(request.quoted_fare).toFixed(2)} quoted` : 'Fare to be confirmed'}</small></div></div>
+        {request.notes && <p className="request-notes">{request.notes}</p>}{request.decision_reason && <p className="request-decision"><b>Decision note:</b> {request.decision_reason}</p>}
+        <footer><a href={`tel:${request.phone}`}><Phone />Call</a><a href={`sms:${request.phone}?body=${encodeURIComponent(`Hello ${request.passenger_name}, regarding your APX RIDE request ${request.reference}: `)}`}><MessageSquareText />Open SMS</a>{request.status === 'RECEIVED' && <button onClick={() => void markReview(request)}>Start review</button>}{['RECEIVED', 'UNDER_REVIEW', 'MORE_INFORMATION_REQUIRED'].includes(request.status) && <><button onClick={() => setDecision({ request, action: 'MORE_INFO' })}>Ask for details</button><button onClick={() => setDecision({ request, action: 'UNAVAILABLE' })}>Driver unavailable</button><button onClick={() => setDecision({ request, action: 'DECLINE' })}>Decline</button><button className="request-accept" onClick={() => setDecision({ request, action: 'ACCEPT' })}><Check />Accept</button></>}{request.status === 'ACCEPTED' && <><span className="booking-link">Booking APX-{String(request.assigned_booking_id || '').padStart(5, '0')}</span><button onClick={() => setDecision({ request, action: 'CANCEL' })}>Cancel booking</button></>}</footer>
+      </article>)}</div>
+    </section>
+    {adding && <RequestModal close={() => setAdding(false)} saved={() => { setAdding(false); void refresh(); }} />}
+    {decision && <DecisionModal decision={decision} close={() => setDecision(null)} save={async (payload) => { if (await update(payload)) { setDecision(null); if (decision.action === 'ACCEPT') setTab('accepted'); } }} />}
+  </section>;
+}
+
+function TemplateEditor({ templates, saved }: { templates: Templates; saved: () => void }) {
+  const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = Object.fromEntries(new FormData(event.currentTarget)); const response = await fetch('/api/booking-requests', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(form) }); const result = await response.json() as { error?: string }; if (!response.ok) { alert(result.error || 'Templates could not be saved.'); return; } saved(); alert('Public booking email templates saved.'); };
+  return <form className="panel request-template-editor" onSubmit={submit}><header><div><small>EMAIL PREPARATION</small><h3>Customer notification templates</h3></div><button className="primary">Save templates</button></header><p>Available fields: {'{passenger}'}, {'{reference}'}, {'{pickup}'}, {'{dropoff}'}, {'{pickupAt}'}, {'{fare}'}, {'{reason}'}.</p><div><label>Request received<textarea name="acknowledgementTemplate" rows={4} defaultValue={templates.acknowledgement_template} required /></label><label>Booking confirmed<textarea name="confirmationTemplate" rows={4} defaultValue={templates.confirmation_template} required /></label><label>Driver unavailable<textarea name="unavailableTemplate" rows={4} defaultValue={templates.unavailable_template} required /></label><label>Booking cancelled<textarea name="cancellationTemplate" rows={4} defaultValue={templates.cancellation_template} required /></label></div></form>;
+}
+
+function NotificationHistory({ notifications }: { notifications: Notification[] }) {
+  return <section className="panel notification-history"><header><div><small>DELIVERY RECORD</small><h3>Notification history</h3></div><span>{notifications.length} recent item{notifications.length === 1 ? '' : 's'}</span></header>{notifications.length ? <div className="table-wrap"><table className="finance-table"><thead><tr><th>Date</th><th>Recipient</th><th>Template</th><th>Subject</th><th>Status</th></tr></thead><tbody>{notifications.map((item) => <tr key={item.id}><td>{new Date(item.created_at).toLocaleString('en-GB')}</td><td>{item.recipient}</td><td>{item.template_key.replaceAll('_', ' ')}</td><td>{item.subject}</td><td><span className={`status-badge ${item.status === 'SENT' ? 'status-good' : item.status === 'FAILED' ? 'status-pending' : 'status-progress'}`}>{item.status}</span></td></tr>)}</tbody></table></div> : <p className="request-empty">No customer notifications have been prepared yet.</p>}</section>;
+}
+
+function RequestModal({ close, saved }: { close: () => void; saved: () => void }) {
+  const [saving, setSaving] = useState(false);
+  const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setSaving(true); const form = Object.fromEntries(new FormData(event.currentTarget)); const response = await fetch('/api/booking-requests', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(form) }); const result = await response.json() as { error?: string }; setSaving(false); if (!response.ok) { alert(result.error || 'Request could not be saved.'); return; } saved(); };
+  return <div className="modal"><button className="scrim" onClick={close} /><form className="record-modal request-modal" onSubmit={submit}><header><div><small>BOOKING ENQUIRY</small><h2>Add booking request</h2></div><button type="button" onClick={close}><X /></button></header><div className="record-form-grid"><label>Passenger name<input name="passengerName" required /></label><label>Email<input name="email" type="email" required /></label><label>Mobile number<input name="phone" type="tel" required /></label><label>Pickup date and time<input name="pickupAt" type="datetime-local" required /></label><label className="record-field-wide">Pickup address<input name="pickup" required /></label><label className="record-field-wide">Destination<input name="dropoff" required /></label><label>Passengers<input name="passengers" type="number" min="1" defaultValue="1" /></label><label>Large bags<input name="largeBags" type="number" min="0" defaultValue="0" /></label><label>Small bags<input name="smallBags" type="number" min="0" defaultValue="0" /></label><label>Fleet tier<select name="fleetTier" defaultValue="Saloon"><option>Saloon</option><option>Estate</option><option>6-seater</option><option>7-seater</option></select></label><label>Estimated fare (£)<input name="quotedFare" type="number" min="0" step="0.01" /></label><label className="record-field-wide">Notes<textarea name="notes" rows={4} /></label></div><footer><button type="button" onClick={close}>Cancel</button><button className="primary" disabled={saving}>{saving ? 'Saving…' : 'Save request'}</button></footer></form></div>;
+}
+
+function DecisionModal({ decision, close, save }: { decision: Decision; close: () => void; save: (payload: Record<string, unknown>) => Promise<void> }) {
+  const { request, action } = decision; const accepting = action === 'ACCEPT';
+  const titles = { ACCEPT: 'Accept and create booking', MORE_INFO: 'Request more information', UNAVAILABLE: 'Mark driver unavailable', DECLINE: 'Decline request', CANCEL: 'Cancel accepted booking' };
+  const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.currentTarget)); await save({ id: request.id, action, ...values }); };
+  return <div className="modal"><button className="scrim" onClick={close} /><form className="payment-card request-decision-modal" onSubmit={submit}><header><div><small>{request.reference}</small><h2>{titles[action]}</h2></div><button type="button" onClick={close}><X /></button></header><p>{request.passenger_name} · {request.pickup} → {request.dropoff}</p>{accepting && <div className="form-grid"><label>Confirmed fare (£)<input name="fare" type="number" min="0" step="0.01" defaultValue={request.quoted_fare || ''} required /></label><label>Fleet tier<select name="fleetTier" defaultValue={request.fleet_tier}><option>Saloon</option><option>Estate</option><option>6-seater</option><option>7-seater</option></select></label><label>Operator<input name="operator" defaultValue="APX RIDE" required /></label><label>Booking type<select name="bookingType"><option>CASH</option><option>ACCOUNT</option></select></label></div>}<label>{accepting ? 'Internal or customer note (optional)' : 'Customer-facing message'}<textarea name="reason" rows={4} required={!accepting} placeholder={accepting ? 'Optional acceptance note' : 'Explain the update clearly and politely'} /></label><p className="notification-note"><Mail />An email notification will be prepared for Phase 2 delivery. You can still use Open SMS from the request card on your mobile.</p><footer><button type="button" onClick={close}>Back</button><button className={`primary ${accepting ? '' : 'request-warning'}`}>{accepting ? 'Accept and create booking' : 'Save decision'}</button></footer></form></div>;
+}

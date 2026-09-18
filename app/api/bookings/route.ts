@@ -48,11 +48,12 @@ export async function POST(req: Request) {
     const b = (await req.json()) as Record<string, unknown>;
     const now = new Date().toISOString();
     const result = await env.DB.prepare(
-      `INSERT INTO bookings(owner_id,passenger_name,phone,pickup,dropoff,pickup_at,operator,driver_call_sign,driver_name,driver_licence,booking_type,passengers,large_bags,small_bags,fleet_tier,distance,fare,base_fare,airport_fee,toll_fee,tariff,status,notes,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO bookings(owner_id,passenger_name,customer_email,phone,pickup,dropoff,pickup_at,operator,driver_call_sign,driver_name,driver_licence,booking_type,passengers,large_bags,small_bags,fleet_tier,distance,fare,base_fare,airport_fee,toll_fee,tariff,status,notes,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     )
       .bind(
         ownerId,
         b.passengerName || 'Unnamed passenger',
+        b.customerEmail || '',
         b.phone || '',
         b.pickup || '',
         b.dropoff || '',
@@ -118,10 +119,11 @@ export async function PUT(req: Request) {
     await ready();
     const b = (await req.json()) as Record<string, unknown>;
     await env.DB.prepare(
-      `UPDATE bookings SET passenger_name=?,phone=?,pickup=?,dropoff=?,pickup_at=?,operator=?,driver_call_sign=?,driver_name=?,driver_licence=?,booking_type=?,passengers=?,large_bags=?,small_bags=?,fleet_tier=?,distance=?,fare=?,base_fare=?,airport_fee=?,toll_fee=?,tariff=?,notes=?,updated_at=? WHERE id=? AND owner_id=?`,
+      `UPDATE bookings SET passenger_name=?,customer_email=?,phone=?,pickup=?,dropoff=?,pickup_at=?,operator=?,driver_call_sign=?,driver_name=?,driver_licence=?,booking_type=?,passengers=?,large_bags=?,small_bags=?,fleet_tier=?,distance=?,fare=?,base_fare=?,airport_fee=?,toll_fee=?,tariff=?,notes=?,updated_at=? WHERE id=? AND owner_id=?`,
     )
       .bind(
         b.passengerName || 'Unnamed passenger',
+        b.customerEmail || '',
         b.phone || '',
         b.pickup || '',
         b.dropoff || '',

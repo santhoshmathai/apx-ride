@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleGauge,
+  ClipboardList,
   Copy,
   Download,
   Eye,
@@ -28,10 +29,12 @@ import {
   X,
 } from 'lucide-react';
 import { RecordsHub } from './records-hub';
+import { BookingRequests } from './booking-requests';
 
 type Booking = {
   id: number;
   passenger_name: string;
+  customer_email?: string;
   phone: string;
   pickup: string;
   dropoff: string;
@@ -93,6 +96,7 @@ const localStorage =
     : window.localStorage;
 const nav = [
   ['Dashboard', LayoutDashboard],
+  ['Booking Requests', ClipboardList],
   ['Booking Control', CarFront],
   ['Calculator', FileText],
   ['Calendar', CalendarDays],
@@ -248,6 +252,7 @@ export function AppShell({ signOutPath }: { signOutPath: string }) {
               messageTemplates={messageTemplates}
             />
           )}
+          {active === 'Booking Requests' && <BookingRequests bookingSaved={() => void refresh()} />}
           {active === 'Calculator' && (
             <Calculator
               rates={rates}

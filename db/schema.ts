@@ -1,8 +1,9 @@
-import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 export const bookings = sqliteTable('bookings', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   ownerId: text('owner_id').notNull(),
   passengerName: text('passenger_name').notNull(),
+  customerEmail: text('customer_email').notNull().default(''),
   phone: text('phone').notNull().default(''),
   pickup: text('pickup').notNull(),
   dropoff: text('dropoff').notNull(),
@@ -120,4 +121,100 @@ export const complianceDocuments = sqliteTable('compliance_documents', {
   contentType: text('content_type').notNull(),
   objectKey: text('object_key').notNull(),
   uploadedAt: text('uploaded_at').notNull(),
+});
+
+export const organisations = sqliteTable('organisations', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull(),
+  ownerUserId: text('owner_user_id').notNull(),
+  ownerEmail: text('owner_email').notNull(),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+export const organisationMembers = sqliteTable('organisation_members', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  organisationId: text('organisation_id').notNull(),
+  userId: text('user_id').notNull(),
+  email: text('email').notNull(),
+  role: text('role').notNull().default('OWNER'),
+  createdAt: text('created_at').notNull(),
+}, (table) => [uniqueIndex('idx_organisation_members_org_user').on(table.organisationId, table.userId)]);
+
+export const publicBookingSettings = sqliteTable('public_booking_settings', {
+  organisationId: text('organisation_id').primaryKey(),
+  publicKey: text('public_key').notNull(),
+  publicBookingsEnabled: integer('public_bookings_enabled', { mode: 'boolean' }).notNull().default(false),
+  acknowledgementTemplate: text('acknowledgement_template').notNull().default(''),
+  confirmationTemplate: text('confirmation_template').notNull().default(''),
+  unavailableTemplate: text('unavailable_template').notNull().default(''),
+  cancellationTemplate: text('cancellation_template').notNull().default(''),
+  updatedAt: text('updated_at').notNull(),
+});
+
+export const bookingRequests = sqliteTable('booking_requests', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  organisationId: text('organisation_id').notNull(),
+  ownerId: text('owner_id').notNull(),
+  reference: text('reference').notNull(),
+  passengerName: text('passenger_name').notNull(),
+  email: text('email').notNull(),
+  phone: text('phone').notNull(),
+  pickup: text('pickup').notNull(),
+  dropoff: text('dropoff').notNull(),
+  pickupAt: text('pickup_at').notNull(),
+  passengers: integer('passengers').notNull().default(1),
+  largeBags: integer('large_bags').notNull().default(0),
+  smallBags: integer('small_bags').notNull().default(0),
+  fleetTier: text('fleet_tier').notNull().default('Saloon'),
+  quotedFare: real('quoted_fare').notNull().default(0),
+  notes: text('notes').notNull().default(''),
+  source: text('source').notNull().default('PORTAL'),
+  status: text('status').notNull().default('RECEIVED'),
+  decisionReason: text('decision_reason').notNull().default(''),
+  assignedBookingId: integer('assigned_booking_id'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+  decidedAt: text('decided_at').notNull().default(''),
+}, (table) => [index('idx_booking_requests_org_created').on(table.organisationId, table.createdAt), uniqueIndex('idx_booking_requests_org_reference').on(table.organisationId, table.reference)]);
+
+export const bookingRequestEvents = sqliteTable('booking_request_events', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  organisationId: text('organisation_id').notNull(),
+  requestId: integer('request_id').notNull(),
+  actorEmail: text('actor_email').notNull(),
+  eventType: text('event_type').notNull(),
+  fromStatus: text('from_status').notNull().default(''),
+  toStatus: text('to_status').notNull(),
+  note: text('note').notNull().default(''),
+  createdAt: text('created_at').notNull(),
+}, (table) => [index('idx_booking_request_events_request').on(table.organisationId, table.requestId)]);
+
+export const notificationOutbox = sqliteTable('notification_outbox', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  organisationId: text('organisation_id').notNull(),
+  requestId: integer('request_id').notNull(),
+  bookingId: integer('booking_id'),
+  channel: text('channel').notNull().default('EMAIL'),
+  recipient: text('recipient').notNull(),
+  templateKey: text('template_key').notNull(),
+  subject: text('subject').notNull(),
+  message: text('message').notNull(),
+  status: text('status').notNull().default('PREPARED'),
+  attempts: integer('attempts').notNull().default(0),
+  lastError: text('last_error').notNull().default(''),
+  createdAt: text('created_at').notNull(),
+  sentAt: text('sent_at').notNull().default(''),
+}, (table) => [index('idx_notification_outbox_org_status').on(table.organisationId, table.status)]);
+
+export const notificationDeliveries = sqliteTable('notification_deliveries', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  organisationId: text('organisation_id').notNull(),
+  outboxId: integer('outbox_id').notNull(),
+  provider: text('provider').notNull(),
+  providerMessageId: text('provider_message_id').notNull().default(''),
+  status: text('status').notNull(),
+  detail: text('detail').notNull().default(''),
+  occurredAt: text('occurred_at').notNull(),
 });
