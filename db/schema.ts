@@ -150,6 +150,10 @@ export const publicBookingSettings = sqliteTable('public_booking_settings', {
   confirmationTemplate: text('confirmation_template').notNull().default(''),
   unavailableTemplate: text('unavailable_template').notNull().default(''),
   cancellationTemplate: text('cancellation_template').notNull().default(''),
+  notificationCopyEmail: text('notification_copy_email').notNull().default('apxride.bookings@gmail.com'),
+  senderName: text('sender_name').notNull().default('APX RIDE'),
+  senderEmail: text('sender_email').notNull().default('bookings@notifications.apxride.com'),
+  replyToEmail: text('reply_to_email').notNull().default('apxride.bookings@gmail.com'),
   updatedAt: text('updated_at').notNull(),
 });
 
@@ -204,6 +208,10 @@ export const notificationOutbox = sqliteTable('notification_outbox', {
   status: text('status').notNull().default('PREPARED'),
   attempts: integer('attempts').notNull().default(0),
   lastError: text('last_error').notNull().default(''),
+  providerMessageId: text('provider_message_id').notNull().default(''),
+  copyTo: text('copy_to').notNull().default(''),
+  nextAttemptAt: text('next_attempt_at').notNull().default(''),
+  lastAttemptAt: text('last_attempt_at').notNull().default(''),
   createdAt: text('created_at').notNull(),
   sentAt: text('sent_at').notNull().default(''),
 }, (table) => [index('idx_notification_outbox_org_status').on(table.organisationId, table.status)]);
@@ -217,4 +225,5 @@ export const notificationDeliveries = sqliteTable('notification_deliveries', {
   status: text('status').notNull(),
   detail: text('detail').notNull().default(''),
   occurredAt: text('occurred_at').notNull(),
-});
+  eventId: text('event_id').notNull().default(''),
+}, (table) => [uniqueIndex('idx_notification_deliveries_event').on(table.eventId), index('idx_notification_deliveries_outbox').on(table.organisationId, table.outboxId)]);

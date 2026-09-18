@@ -57,6 +57,13 @@
       "when": 1789690044929,
       "tag": "0007_perfect_madripoor",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1789715386104,
+      "tag": "0008_serious_lila_cheney",
+      "breakpoints": true
     }
   ]
 }

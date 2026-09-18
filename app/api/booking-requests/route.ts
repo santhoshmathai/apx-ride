@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { NextResponse } from 'next/server';
 import { getChatGPTUser, isApprovedEmail } from '../../chatgpt-auth';
+import { sendOutbox } from '../../email-service';
 
 type PortalUser = { userId: string; email: string };
 type RequestRow = Record<string, unknown> & { id: number; status: string; reference: string; passenger_name: string; email: string; phone: string; pickup: string; dropoff: string; pickup_at: string; passengers: number; large_bags: number; small_bags: number; fleet_tier: string; quoted_fare: number; notes: string; assigned_booking_id?: number | null };
@@ -37,9 +38,9 @@ export async function GET() {
   const [requests, organisation, settings, prepared, notifications] = await Promise.all([
     env.DB.prepare('SELECT * FROM booking_requests WHERE organisation_id=? ORDER BY created_at DESC').bind(orgId).all(),
     env.DB.prepare('SELECT id,name,slug,owner_email FROM organisations WHERE id=?').bind(orgId).first(),
-    env.DB.prepare('SELECT public_bookings_enabled,acknowledgement_template,confirmation_template,unavailable_template,cancellation_template FROM public_booking_settings WHERE organisation_id=?').bind(orgId).first(),
+    env.DB.prepare('SELECT public_bookings_enabled,acknowledgement_template,confirmation_template,unavailable_template,cancellation_template,notification_copy_email,sender_name,sender_email,reply_to_email FROM public_booking_settings WHERE organisation_id=?').bind(orgId).first(),
     env.DB.prepare("SELECT COUNT(*) AS count FROM notification_outbox WHERE organisation_id=? AND status='PREPARED'").bind(orgId).first<{ count: number }>(),
-    env.DB.prepare('SELECT id,request_id,booking_id,channel,recipient,template_key,subject,status,attempts,last_error,created_at,sent_at FROM notification_outbox WHERE organisation_id=? ORDER BY created_at DESC LIMIT 50').bind(orgId).all(),
+    env.DB.prepare('SELECT id,request_id,booking_id,channel,recipient,template_key,subject,status,attempts,last_error,provider_message_id,next_attempt_at,last_attempt_at,created_at,sent_at FROM notification_outbox WHERE organisation_id=? ORDER BY created_at DESC LIMIT 50').bind(orgId).all(),
   ]);
   return NextResponse.json({ requests: requests.results, organisation, publicBookingsEnabled: Boolean(settings?.public_bookings_enabled), preparedNotifications: prepared?.count || 0, notificationTemplates: settings, notifications: notifications.results });
 }
@@ -68,10 +69,9 @@ export async function POST(req: Request) {
   const requestId = Number(result.meta.last_row_id);
   const settings = await env.DB.prepare('SELECT acknowledgement_template FROM public_booking_settings WHERE organisation_id=?').bind(orgId).first<{ acknowledgement_template: string }>();
   const createdRequest = { id: requestId, status: 'RECEIVED', reference, passenger_name: passengerName, email, phone, pickup, dropoff, pickup_at: pickupAt, passengers: numberValue(body.passengers, 1) || 1, large_bags: numberValue(body.largeBags), small_bags: numberValue(body.smallBags), fleet_tier: requiredText(body.fleetTier, 60) || 'Saloon', quoted_fare: numberValue(body.quotedFare), notes: requiredText(body.notes, 1000) } as RequestRow;
-  await env.DB.batch([
-    env.DB.prepare('INSERT INTO booking_request_events(organisation_id,request_id,actor_email,event_type,from_status,to_status,note,created_at) VALUES(?,?,?,?,?,?,?,?)').bind(orgId, requestId, user.email, 'REQUEST_CREATED', '', 'RECEIVED', 'Request recorded in portal', now),
-    env.DB.prepare('INSERT INTO notification_outbox(organisation_id,request_id,channel,recipient,template_key,subject,message,status,attempts,last_error,created_at,sent_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').bind(orgId, requestId, 'EMAIL', email, 'REQUEST_RECEIVED', `APX RIDE request received — ${reference}`, render(settings?.acknowledgement_template || 'Thank you {passenger}. We received request {reference} and will confirm availability shortly.', createdRequest, Number(createdRequest.quoted_fare), ''), 'PREPARED', 0, '', now, ''),
-  ]);
+  await env.DB.prepare('INSERT INTO booking_request_events(organisation_id,request_id,actor_email,event_type,from_status,to_status,note,created_at) VALUES(?,?,?,?,?,?,?,?)').bind(orgId, requestId, user.email, 'REQUEST_CREATED', '', 'RECEIVED', 'Request recorded in portal', now).run();
+  const notification = await env.DB.prepare('INSERT INTO notification_outbox(organisation_id,request_id,channel,recipient,template_key,subject,message,status,attempts,last_error,created_at,sent_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').bind(orgId, requestId, 'EMAIL', email, 'REQUEST_RECEIVED', `APX RIDE request received — ${reference}`, render(settings?.acknowledgement_template || 'Thank you {passenger}. We received request {reference} and will confirm availability shortly.', createdRequest, Number(createdRequest.quoted_fare), ''), 'PREPARED', 0, '', now, '').run();
+  await sendOutbox(Number(notification.meta.last_row_id), orgId);
   return NextResponse.json({ id: requestId, reference }, { status: 201 });
 }
 
@@ -96,8 +96,9 @@ export async function PATCH(req: Request) {
     await env.DB.batch([
       env.DB.prepare("UPDATE booking_requests SET status='ACCEPTED',quoted_fare=?,fleet_tier=?,assigned_booking_id=?,decision_reason=?,updated_at=?,decided_at=? WHERE id=? AND organisation_id=?").bind(fare, requiredText(body.fleetTier, 60) || row.fleet_tier, bookingId, reason, now, now, id, orgId),
       env.DB.prepare('INSERT INTO booking_request_events(organisation_id,request_id,actor_email,event_type,from_status,to_status,note,created_at) VALUES(?,?,?,?,?,?,?,?)').bind(orgId, id, user.email, 'REQUEST_ACCEPTED', row.status, 'ACCEPTED', reason, now),
-      env.DB.prepare('INSERT INTO notification_outbox(organisation_id,request_id,booking_id,channel,recipient,template_key,subject,message,status,attempts,last_error,created_at,sent_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(orgId, id, bookingId, 'EMAIL', row.email, 'BOOKING_CONFIRMED', `APX RIDE booking confirmed — ${row.reference}`, render(settings?.confirmation_template || 'Your APX RIDE booking {reference} is confirmed for {pickupAt}, from {pickup} to {dropoff}. Confirmed fare: £{fare}.', row, fare, reason), 'PREPARED', 0, '', now, ''),
     ]);
+    const notification = await env.DB.prepare('INSERT INTO notification_outbox(organisation_id,request_id,booking_id,channel,recipient,template_key,subject,message,status,attempts,last_error,created_at,sent_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(orgId, id, bookingId, 'EMAIL', row.email, 'BOOKING_CONFIRMED', `APX RIDE booking confirmed — ${row.reference}`, render(settings?.confirmation_template || 'Your APX RIDE booking {reference} is confirmed for {pickupAt}, from {pickup} to {dropoff}. Confirmed fare: £{fare}.', row, fare, reason), 'PREPARED', 0, '', now, '').run();
+    await sendOutbox(Number(notification.meta.last_row_id), orgId);
     return NextResponse.json({ ok: true, bookingId, status: 'ACCEPTED' });
   }
 
@@ -113,7 +114,8 @@ export async function PATCH(req: Request) {
   if (templateKey) {
     const settings = await env.DB.prepare('SELECT unavailable_template,cancellation_template FROM public_booking_settings WHERE organisation_id=?').bind(orgId).first<{ unavailable_template: string; cancellation_template: string }>();
     const chosen = action === 'UNAVAILABLE' ? settings?.unavailable_template : action === 'CANCEL' ? settings?.cancellation_template : '{passenger}, {reason}';
-    await env.DB.prepare('INSERT INTO notification_outbox(organisation_id,request_id,booking_id,channel,recipient,template_key,subject,message,status,attempts,last_error,created_at,sent_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(orgId, id, row.assigned_booking_id || null, 'EMAIL', row.email, templateKey, `APX RIDE booking update — ${row.reference}`, render(chosen || '{passenger}, {reason}', row, Number(row.quoted_fare) || 0, reason), 'PREPARED', 0, '', now, '').run();
+    const notification = await env.DB.prepare('INSERT INTO notification_outbox(organisation_id,request_id,booking_id,channel,recipient,template_key,subject,message,status,attempts,last_error,created_at,sent_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(orgId, id, row.assigned_booking_id || null, 'EMAIL', row.email, templateKey, `APX RIDE booking update — ${row.reference}`, render(chosen || '{passenger}, {reason}', row, Number(row.quoted_fare) || 0, reason), 'PREPARED', 0, '', now, '').run();
+    await sendOutbox(Number(notification.meta.last_row_id), orgId);
   }
   return NextResponse.json({ ok: true, status: next });
 }
