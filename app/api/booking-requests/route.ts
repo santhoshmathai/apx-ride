@@ -87,9 +87,26 @@ export async function PATCH(req: Request) {
   const now = new Date().toISOString();
   const reason = requiredText(body.reason, 500);
 
+  if (action === 'QUOTE') {
+    if (!['RECEIVED', 'UNDER_REVIEW', 'MORE_INFORMATION_REQUIRED', 'QUOTED'].includes(row.status) || row.assigned_booking_id) return NextResponse.json({ error: 'Only open requests can be quoted.' }, { status: 409 });
+    const fare = Number(body.fare);
+    if (!Number.isFinite(fare) || fare <= 0 || fare > 100000 || Math.abs(Math.round(fare * 100) - fare * 100) > 0.000001) return NextResponse.json({ error: 'Enter a valid fare in pounds and pence.' }, { status: 400 });
+    const message = `Hello ${row.passenger_name},\n\nThank you for your APX RIDE enquiry ${row.reference}. We can offer your journey on ${new Date(row.pickup_at).toLocaleString('en-GB')} from ${row.pickup} to ${row.dropoff} for £${fare.toFixed(2)}.\n\nThis is a quotation, not a confirmed booking. Please reply to this email to agree the fare or discuss any changes. We will send a separate booking confirmation once the details are agreed and the journey is accepted.\n\nAPX RIDE`;
+    await env.DB.batch([
+      env.DB.prepare("UPDATE booking_requests SET status='QUOTED',quoted_fare=?,updated_at=? WHERE id=? AND organisation_id=?").bind(fare, now, id, orgId),
+      env.DB.prepare('INSERT INTO booking_request_events(organisation_id,request_id,actor_email,event_type,from_status,to_status,note,created_at) VALUES(?,?,?,?,?,?,?,?)').bind(orgId, id, user.email, 'QUOTE_SENT', row.status, 'QUOTED', `Fare £${fare.toFixed(2)}`, now),
+    ]);
+    const notification = await env.DB.prepare('INSERT INTO notification_outbox(organisation_id,request_id,channel,recipient,template_key,subject,message,status,attempts,last_error,created_at,sent_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').bind(orgId, id, 'EMAIL', row.email, 'FARE_QUOTE', `APX RIDE fare quote — ${row.reference}`, message, 'PREPARED', 0, '', now, '').run();
+    const delivery = await sendOutbox(Number(notification.meta.last_row_id), orgId);
+    return NextResponse.json({ ok: true, status: 'QUOTED', notificationStatus: delivery.status });
+  }
+
   if (action === 'ACCEPT') {
+    if (!['RECEIVED', 'UNDER_REVIEW', 'MORE_INFORMATION_REQUIRED', 'QUOTED'].includes(row.status)) return NextResponse.json({ error: 'Only open requests can be accepted.' }, { status: 409 });
+    if (body.customerAgreed !== true) return NextResponse.json({ error: 'Confirm that the customer agreed the fare before accepting.' }, { status: 400 });
     if (row.status === 'ACCEPTED' || row.assigned_booking_id) return NextResponse.json({ error: 'This request has already been accepted.' }, { status: 409 });
     const fare = numberValue(body.fare, Number(row.quoted_fare) || 0);
+    if (fare <= 0 || fare > 100000) return NextResponse.json({ error: 'Enter the agreed fare before accepting.' }, { status: 400 });
     const booking = await env.DB.prepare('INSERT INTO bookings(owner_id,passenger_name,customer_email,phone,pickup,dropoff,pickup_at,operator,driver_call_sign,driver_name,driver_licence,booking_type,passengers,large_bags,small_bags,fleet_tier,distance,fare,base_fare,airport_fee,toll_fee,tariff,status,notes,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(user.userId, row.passenger_name, row.email, row.phone, row.pickup, row.dropoff, row.pickup_at, requiredText(body.operator, 80) || 'APX RIDE', '', '', '', requiredText(body.bookingType, 20) || 'CASH', row.passengers || 1, row.large_bags || 0, row.small_bags || 0, requiredText(body.fleetTier, 60) || row.fleet_tier || 'Saloon', 0, fare, 0, 0, 0, 'day', 'upcoming', [row.notes, `Created from ${row.reference}`].filter(Boolean).join(' · '), now, now).run();
     const bookingId = Number(booking.meta.last_row_id);
     const settings = await env.DB.prepare('SELECT confirmation_template FROM public_booking_settings WHERE organisation_id=?').bind(orgId).first<{ confirmation_template: string }>();
@@ -104,6 +121,8 @@ export async function PATCH(req: Request) {
 
   const next = transitions[action];
   if (!next) return NextResponse.json({ error: 'Unsupported action' }, { status: 400 });
+  if (!['RECEIVED', 'UNDER_REVIEW', 'MORE_INFORMATION_REQUIRED', 'QUOTED'].includes(row.status) && action !== 'CANCEL') return NextResponse.json({ error: 'This request is already closed.' }, { status: 409 });
+  if (action === 'CANCEL' && row.status !== 'ACCEPTED') return NextResponse.json({ error: 'Only accepted bookings can be cancelled.' }, { status: 409 });
   if ((action === 'UNAVAILABLE' || action === 'DECLINE' || action === 'CANCEL' || action === 'MORE_INFO') && !reason) return NextResponse.json({ error: 'Please provide a customer-facing reason or message.' }, { status: 400 });
   if (action === 'CANCEL' && row.assigned_booking_id) await env.DB.prepare("UPDATE bookings SET status='archived',updated_at=? WHERE id=? AND owner_id=?").bind(now, row.assigned_booking_id, user.userId).run();
   const templateKey = action === 'UNAVAILABLE' ? 'DRIVER_UNAVAILABLE' : action === 'DECLINE' ? 'REQUEST_DECLINED' : action === 'CANCEL' ? 'BOOKING_CANCELLED' : action === 'MORE_INFO' ? 'MORE_INFORMATION_REQUIRED' : '';

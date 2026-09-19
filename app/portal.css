@@ -1395,3 +1395,4 @@ label textarea {
   .email-service-panel>header{align-items:stretch;flex-direction:column}.email-service-panel header>div:last-child{flex-direction:column}.email-service-panel>form{grid-template-columns:1fr}
 }
 @media (max-width:430px){.request-summary-grid{grid-template-columns:1fr}.request-card>footer a,.request-card>footer button{flex-basis:100%}}
+.request-agreement{display:flex!important;align-items:flex-start;gap:10px;line-height:1.5;color:#ddd;font-size:.82rem}.request-agreement input{flex:0 0 auto;width:18px!important;height:18px!important;min-height:0!important;margin-top:2px;accent-color:#d8aa2d}.request-status.quoted{color:#9ac5ee;background:#142333}
