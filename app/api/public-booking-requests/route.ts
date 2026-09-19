@@ -60,15 +60,23 @@ export async function POST(req: Request) {
   const phone = text(input.phone, 40);
   const pickup = text(input.pickup, 300);
   const dropoff = text(input.dropoff, 300);
-  const pickupAt = text(input.pickupAt, 40);
+  const pickupAtInput = text(input.pickupAt, 40);
+  // datetime-local may include seconds on some browsers. Store minutes consistently.
+  const pickupAtMatch = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::\d{2}(?:\.\d{1,3})?)?$/.exec(pickupAtInput);
+  const pickupAt = pickupAtMatch?.[1] || '';
   const flightNumber = text(input.flightNumber, 60);
   const notes = text(input.notes, 800);
   const passengers = wholeNumber(input.passengers, 7, -1);
   const largeBags = wholeNumber(input.largeBags, 4, -1);
   const smallBags = wholeNumber(input.smallBags, 4, -1);
-  if (!passengerName || !phone || !pickup || !dropoff || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(pickupAt) || passengers < 1 || largeBags < 0 || smallBags < 0) {
-    return error(origin, 'Please check the journey, passenger and luggage details.', 400);
-  }
+  if (!passengerName) return error(origin, 'Please enter the passenger name.', 400);
+  if (!phone) return error(origin, 'Please enter a contact phone number.', 400);
+  if (!pickup) return error(origin, 'Please enter the pickup address.', 400);
+  if (!dropoff) return error(origin, 'Please enter the destination address.', 400);
+  if (!pickupAt || Number.isNaN(Date.parse(pickupAt))) return error(origin, 'Please choose a valid pickup date and time.', 400);
+  if (passengers < 1) return error(origin, 'Please enter 1 to 7 passengers.', 400);
+  if (largeBags < 0) return error(origin, 'Please enter 0 to 4 large suitcases.', 400);
+  if (smallBags < 0) return error(origin, 'Please enter 0 to 4 small bags.', 400);
 
   const organisation = await env.DB.prepare('SELECT id,owner_user_id FROM organisations WHERE lower(owner_email)=?').bind(TEST_EMAIL).first<{ id: string; owner_user_id: string }>();
   if (!organisation) return error(origin, 'The booking operator is not ready. Sign in to the portal with the bookings account and open Booking Requests first.', 503);
