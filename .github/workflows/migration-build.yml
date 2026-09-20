@@ -1,0 +1,34 @@
+name: Migration build checks
+
+on:
+  push:
+    branches:
+      - codex/cloudflare-portal-migration
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build independent Cloudflare bundle (no deploy)
+        run: pnpm run build:cloudflare
+      - name: Check public website source
+        run: |
+          node --check website/app.js
+          test -s website/index.html
+          test -s website/styles.css
+          test -s website/assets/apx-logo.png
+          test -s website/assets/airport-van-hero.png
+      - name: Preserve current Sites build compatibility
+        run: pnpm run build

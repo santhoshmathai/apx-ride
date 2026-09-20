@@ -1,4 +1,3 @@
-import { sites } from '@openai/sites-vite-plugin';
 import tailwindcss from '@tailwindcss/postcss';
 import vinext from 'vinext';
 import { defineConfig } from 'vite';
@@ -34,7 +33,13 @@ const localBindingConfig = {
     : [],
 };
 
-export default defineConfig(async () => {
+export default defineConfig(async ({ mode }) => {
+  // Keep the existing Sites build unchanged while we prepare an independent
+  // Cloudflare build. No production deployment is configured by this switch.
+  const independentCloudflareBuild = mode === 'cloudflare';
+  const sitesPlugins = independentCloudflareBuild
+    ? []
+    : [(await import('@openai/sites-vite-plugin')).sites()];
   // Keep Wrangler and Miniflare state project-local. These are non-secret tool
   // settings; application environment belongs in ignored `.env*` files.
   process.env.WRANGLER_WRITE_LOGS ??= 'false';
@@ -51,10 +56,12 @@ export default defineConfig(async () => {
       : undefined,
     plugins: [
       vinext(),
-      sites(),
+      ...sitesPlugins,
       cloudflare({
         viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] },
-        config: localBindingConfig,
+        config: independentCloudflareBuild
+          ? { ...localBindingConfig, name: 'apx-ride-portal-staging' }
+          : localBindingConfig,
       }),
     ],
   };
