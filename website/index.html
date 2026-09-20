@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>APX RIDE | Gatwick Airport Transfers & 7-Seater MPV Private Hire</title>
+  <meta name="description" content="Plan a private 7-seater MPV airport transfer serving Gatwick, Reigate, Redhill and nearby areas. Luggage space for four large suitcases and four small bags.">
+  <meta name="theme-color" content="#0b0d0f">
+  <link rel="canonical" href="https://apxride.com/">
+  <link rel="preload" href="/assets/airport-van-hero.png" as="image">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='29' fill='%230b0d0f' stroke='%23d7ac46' stroke-width='3'/%3E%3Cpath d='M12 39 25 21l7 9 7-13 13 22h-9l-5-8-6 11-7-9-5 6Z' fill='%23d7ac46'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TaxiService","name":"APX RIDE","url":"https://apxride.com/","areaServed":["Gatwick Airport","Reigate","Redhill","Surrey"],"serviceType":["Airport transfer","Private hire","Group transfer","7-seater MPV hire"]}</script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header" id="top">
+    <a class="brand" href="#top" aria-label="APX RIDE home"><img src="/assets/apx-logo.png" alt="APX RIDE"><span><b>APX RIDE</b><small>Elevate every mile</small></span></a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+    <nav id="nav" aria-label="Main navigation"><a href="#services">Services</a><a href="#vehicle">The vehicle</a><a href="#areas">Areas</a><a href="#faq">FAQs</a><a class="nav-cta" href="#booking">Request a ride</a></nav>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <img class="hero-image" src="/assets/airport-van-hero.png" alt="Premium passenger van outside an airport terminal at dawn">
+      <div class="hero-shade"></div>
+      <div class="hero-copy">
+        <p class="eyebrow">Gatwick · Reigate · Redhill</p>
+        <h1>Airport transfers with room for <em>everyone.</em></h1>
+        <p class="hero-lead">Private group travel in a 7-seater MPV, with room for up to four large suitcases and four small bags.</p>
+        <div class="hero-actions"><a class="button primary" href="#booking">Request a ride</a></div>
+        <ul class="hero-facts" aria-label="Service highlights"><li><b>7</b><span>passenger seats</span></li><li><b>4 + 4</b><span>large + small bags</span></li><li><b>Local</b><span>airport service</span></li></ul>
+      </div>
+    </section>
+
+    <section class="booking-surface" id="booking" aria-labelledby="booking-heading">
+      <div class="booking-intro"><p class="eyebrow">Plan your journey</p><h2 id="booking-heading">A simple start to your transfer.</h2><p>Send your journey details. APX RIDE will review availability and email you a fare before any booking is confirmed.</p></div>
+      <div class="booking-card">
+        <section class="tab-panel active" id="request-panel" aria-label="Booking request">
+          <form id="request-form" class="form-grid">
+            <label>Passenger name<input name="passengerName" autocomplete="name" required></label>
+            <label>Email address<input name="email" type="email" autocomplete="email" required></label>
+            <label>Mobile number<input name="phone" type="tel" autocomplete="tel" required></label>
+            <label>Pickup date & time<input name="pickupAt" type="datetime-local" required></label>
+            <label class="wide">Pickup address<input name="pickup" autocomplete="street-address" required></label>
+            <label class="wide">Destination<input name="dropoff" required></label>
+            <label>Passengers<input name="passengers" type="number" min="1" max="7" value="1" required></label>
+            <label>Large suitcases<input name="largeBags" type="number" min="0" max="4" value="0"></label>
+            <label>Small bags<input name="smallBags" type="number" min="0" max="4" value="0"></label>
+            <label>Flight number (optional)<input name="flightNumber" autocomplete="off"></label>
+            <label class="wide">Anything else we should know?<textarea name="notes" rows="3" placeholder="Child seats, accessibility requirements or journey notes"></textarea></label>
+            <label aria-hidden="true" style="display:none">Website<input name="website" tabindex="-1" autocomplete="off"></label>
+            <label class="consent wide"><input name="privacy" type="checkbox" required><span>I agree that APX RIDE may use these details to respond to this booking request. Submitting a request does not confirm the journey.</span></label>
+            <div class="connection-notice wide"><b>Test mode — public bookings are not open yet.</b><span>Only the APX RIDE bookings test email can submit a request. Other addresses will not be stored or contacted. A request is not a confirmed booking.</span></div>
+            <button class="button primary wide" type="submit">Send test request</button>
+          </form>
+          <div class="request-summary" id="request-summary" hidden aria-live="polite"></div>
+        </section>
+      </div>
+    </section>
+
+    <section class="service-section" id="services"><div class="section-heading"><p class="eyebrow">Made for real journeys</p><h2>One spacious vehicle. Several ways to travel well.</h2></div><div class="service-grid"><article><span>01</span><h3>Gatwick airport transfers</h3><p>Pre-planned pickup and drop-off journeys for passengers, families and groups travelling with luggage.</p></article><article><span>02</span><h3>Group private hire</h3><p>Travel together in one 7-seater MPV for events, family trips and longer-distance journeys.</p></article><article><span>03</span><h3>Local connections</h3><p>Convenient private hire serving Reigate, Redhill, Gatwick and nearby Surrey communities.</p></article></div></section>
+
+    <section class="vehicle-section" id="vehicle"><div class="vehicle-card"><p class="eyebrow">The APX RIDE vehicle</p><h2>Space without splitting the group.</h2><p>The 7-seater MPV is designed for airport journeys where passengers and luggage travel together. Tell us your exact group size and bag dimensions when requesting a ride so suitability can be confirmed.</p><dl><div><dt>Passenger capacity</dt><dd>Up to 7 passengers</dd></div><div><dt>Luggage guide</dt><dd>4 large suitcases + 4 small bags</dd></div><div><dt>Best suited to</dt><dd>Airport & group travel</dd></div></dl></div><blockquote>“A calmer way to start and finish the journey.”<small>APX RIDE · Elevate every mile</small></blockquote></section>
+
+    <section class="areas-section" id="areas"><div class="section-heading"><p class="eyebrow">Local knowledge</p><h2>Serving Gatwick and the surrounding area.</h2><p>Airport and private-hire requests are welcomed from these core locations and nearby communities.</p></div><div class="area-list"><article><b>Gatwick Airport</b><span>Airport pickup & drop-off</span></article><article><b>Reigate</b><span>Local & airport journeys</span></article><article><b>Redhill</b><span>Local & airport journeys</span></article><article><b>Nearby Surrey</b><span>Ask us about your route</span></article></div></section>
+
+    <section class="steps"><div class="section-heading"><p class="eyebrow">How it works</p><h2>Request now. Confirm with confidence.</h2></div><ol><li><b>01</b><h3>Share the journey</h3><p>Provide the route, date, passenger count and luggage.</p></li><li><b>02</b><h3>Review the fare</h3><p>APX RIDE checks availability and emails you a fare. Reply to discuss or agree it.</p></li><li><b>03</b><h3>Receive confirmation</h3><p>Your ride is booked only after APX RIDE sends a booking confirmation.</p></li></ol></section>
+
+    <section class="faq-section" id="faq"><div class="section-heading"><p class="eyebrow">Useful answers</p><h2>Before you request a ride.</h2></div><div class="faq-list"><details><summary>When will I receive the fare?</summary><p>APX RIDE will review your request and email a fare. You can reply to agree it or discuss your plans before any booking is confirmed.</p></details><details><summary>How many passengers and bags can travel?</summary><p>The MPV has up to seven passenger seats and space for up to four large suitcases plus four small bags. Bag sizes vary, so include accurate luggage details in your request.</p></details><details><summary>Does submitting the form confirm my ride?</summary><p>No. Your journey is confirmed only when APX RIDE accepts the request and sends a booking confirmation.</p></details><details><summary>Can I request a trip outside Gatwick, Reigate or Redhill?</summary><p>Yes. Add the full pickup and destination details and APX RIDE can review the route.</p></details></div></section>
+
+    <section class="closing"><p class="eyebrow">Ready when you are</p><h2>Plan the journey. Keep the group together.</h2><a class="button primary" href="#booking">Request a ride</a></section>
+  </main>
+
+  <footer><a class="brand footer-brand" href="#top"><img src="/assets/apx-logo.png" alt=""><span><b>APX RIDE</b><small>Elevate every mile</small></span></a><p>Private airport transfers and group travel around Gatwick, Reigate and Redhill.</p><div><a href="#booking">Booking request</a><a href="#faq">FAQs</a></div><small>© <span id="year"></span> APX RIDE. All rights reserved.</small></footer>
+  <script src="/app.js" defer></script>
+</body>
+</html>

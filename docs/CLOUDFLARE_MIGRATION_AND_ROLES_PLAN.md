@@ -88,7 +88,7 @@ These controls assist compliance but software alone cannot guarantee a licence o
 ## 6. Source control and environment preparation
 
 - Portal GitHub source is the `portal/` repository; create feature branch `codex/cloudflare-portal-migration` and make incremental reviewable commits. Do not push or merge to production as a side effect of planning.
-- Public website is currently a **separate local Git repository without a GitHub remote** and tracks generated `dist/` files. Before production CI, import its maintained source/assets into the GitHub workflow in a reviewed location or connect a dedicated repository. Do not commit a nested `.git` directory or assume the generated bundle is a maintainable source project.
+- Public website originated in a **separate local Git repository without a GitHub remote**. Its current static HTML/CSS/JavaScript and image assets are now imported into this GitHub repository under `website/`; the original local repository remains untouched. Before production CI, review source ownership and treat `website/` as the maintained source, not an unreviewed Sites-generated archive. No nested `.git` or Sites hosting metadata is included.
 - Use separate staging and production Workers, D1 databases, R2 buckets, Access applications, secrets, Resend webhook endpoints and DNS names. Keep production customer data out of staging; use synthetic fixtures.
 - Pin dependency versions, run build/tests in CI, require approval for production deploys and document rollback. Secrets live in Cloudflare, not GitHub or the repository.
 
