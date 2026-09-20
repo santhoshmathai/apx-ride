@@ -1,9 +1,9 @@
 import { env } from 'cloudflare:workers';
 import { NextResponse } from 'next/server';
-import { getChatGPTUser, isApprovedEmail } from '../../chatgpt-auth';
+import { getPortalAdmin } from '../../portal-auth';
 import { emailConfigured, processDueOutbox, sendOutbox, webhookConfigured } from '../../email-service';
 
-async function current() { const user = await getChatGPTUser(); return user && isApprovedEmail(user.email) ? user : null; }
+async function current() { return getPortalAdmin(); }
 function org(userId: string) { return `org_${userId}`; }
 
 export async function GET() {

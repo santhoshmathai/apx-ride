@@ -1,11 +1,10 @@
 import { env } from 'cloudflare:workers';
 import { NextResponse } from 'next/server';
-import { getChatGPTUser, isApprovedEmail } from '../../chatgpt-auth';
+import { getPortalAdmin } from '../../portal-auth';
 
 async function authenticatedOwner(): Promise<string> {
-  const user = await getChatGPTUser();
+  const user = await getPortalAdmin();
   if (!user) throw new Error('AUTH_REQUIRED');
-  if (!isApprovedEmail(user.email)) throw new Error('ACCESS_DENIED');
   return user.userId;
 }
 

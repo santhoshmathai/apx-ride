@@ -1,19 +1,15 @@
 import { env } from 'cloudflare:workers';
 import { NextResponse } from 'next/server';
-import { getChatGPTUser, isApprovedEmail } from '../../chatgpt-auth';
+import { getPortalAdmin } from '../../portal-auth';
 
 async function owner() {
-  const user = await getChatGPTUser();
+  const user = await getPortalAdmin();
   if (!user)
     return {
       error: NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 },
       ),
-    };
-  if (!isApprovedEmail(user.email))
-    return {
-      error: NextResponse.json({ error: 'Access denied' }, { status: 403 }),
     };
   return { id: user.userId };
 }

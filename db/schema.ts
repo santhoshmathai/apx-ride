@@ -2,6 +2,7 @@ import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-or
 export const bookings = sqliteTable('bookings', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   ownerId: text('owner_id').notNull(),
+  assignedDriverUserId: text('assigned_driver_user_id'),
   passengerName: text('passenger_name').notNull(),
   customerEmail: text('customer_email').notNull().default(''),
   phone: text('phone').notNull().default(''),
@@ -141,6 +142,18 @@ export const organisationMembers = sqliteTable('organisation_members', {
   role: text('role').notNull().default('OWNER'),
   createdAt: text('created_at').notNull(),
 }, (table) => [uniqueIndex('idx_organisation_members_org_user').on(table.organisationId, table.userId)]);
+
+export const portalStaff = sqliteTable('portal_staff', {
+  id: text('id').primaryKey(),
+  organisationId: text('organisation_id').notNull(),
+  ownerId: text('owner_id').notNull(),
+  email: text('email').notNull(),
+  role: text('role').notNull(),
+  accessSubject: text('access_subject'),
+  active: integer('active').notNull().default(1),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => [uniqueIndex('idx_portal_staff_email').on(table.email), uniqueIndex('idx_portal_staff_access_subject').on(table.accessSubject)]);
 
 export const publicBookingSettings = sqliteTable('public_booking_settings', {
   organisationId: text('organisation_id').primaryKey(),

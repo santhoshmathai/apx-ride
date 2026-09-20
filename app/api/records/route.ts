@@ -1,10 +1,10 @@
 import { env } from 'cloudflare:workers';
 import { NextResponse } from 'next/server';
-import { getChatGPTUser, isApprovedEmail } from '../../chatgpt-auth';
+import { getPortalAdmin } from '../../portal-auth';
 
 async function authorised() {
-  const user = await getChatGPTUser();
-  if (!user || !isApprovedEmail(user.email)) return null;
+  const user = await getPortalAdmin();
+  if (!user) return null;
   return user;
 }
 

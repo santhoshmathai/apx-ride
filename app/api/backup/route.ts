@@ -1,10 +1,10 @@
 import { env } from 'cloudflare:workers';
 import { NextResponse } from 'next/server';
-import { getChatGPTUser, isApprovedEmail } from '../../chatgpt-auth';
+import { getPortalAdmin } from '../../portal-auth';
 
 export async function GET() {
-  const user = await getChatGPTUser();
-  if (!user || !isApprovedEmail(user.email)) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  const user = await getPortalAdmin();
+  if (!user) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   const [bookings, expenses, records, revisions, availability, messages, documents, settings, audit, organisation, bookingRequests, bookingRequestEvents, notificationOutbox] = await Promise.all([
     env.DB.prepare('SELECT * FROM bookings WHERE owner_id=?').bind(user.userId).all(),
     env.DB.prepare('SELECT * FROM expenses WHERE owner_id=?').bind(user.userId).all(),
