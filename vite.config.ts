@@ -2,8 +2,9 @@ import tailwindcss from '@tailwindcss/postcss';
 import vinext from 'vinext';
 import { defineConfig } from 'vite';
 
-const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
+const SITE_CREATOR_DATABASE_ID =
   '00000000-0000-4000-8000-000000000000';
+const STAGING_DATABASE_ID = '06ebd43e-b555-4a7b-b763-e4f3a07412ba';
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === 'seatbelt';
@@ -25,11 +26,19 @@ export default defineConfig(async ({ mode }) => {
       ? [{
           binding: d1,
           database_name: independentCloudflareBuild ? 'apx-ride-staging' : 'site-creator-d1',
-          database_id: SITE_CREATOR_PLACEHOLDER_DATABASE_ID,
+          database_id: independentCloudflareBuild
+            ? STAGING_DATABASE_ID
+            : SITE_CREATOR_DATABASE_ID,
         }]
       : [],
     r2_buckets: r2
-      ? [{ binding: r2, bucket_name: independentCloudflareBuild ? 'apx-ride-staging-documents' : 'site-creator-r2' }]
+      ? [{
+          binding: r2,
+          bucket_name: independentCloudflareBuild
+            ? 'apx-ride-staging-documents'
+            : 'site-creator-r2',
+          ...(independentCloudflareBuild ? { jurisdiction: 'eu' } : {}),
+        }]
       : [],
   };
   // Keep Wrangler and Miniflare state project-local. These are non-secret tool
