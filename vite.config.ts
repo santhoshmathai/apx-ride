@@ -5,6 +5,9 @@ import { defineConfig } from 'vite';
 const SITE_CREATOR_DATABASE_ID =
   '00000000-0000-4000-8000-000000000000';
 const STAGING_DATABASE_ID = '06ebd43e-b555-4a7b-b763-e4f3a07412ba';
+const STAGING_ACCESS_TEAM_DOMAIN = 'apxride-portal.cloudflareaccess.com';
+const STAGING_ACCESS_AUDIENCE =
+  '181dd9cad29cea775fe99891906e45fa8e5f10b8d93abd52e70c08fd8de23fc7';
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === 'seatbelt';
@@ -62,7 +65,23 @@ export default defineConfig(async ({ mode }) => {
       cloudflare({
         viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] },
         config: independentCloudflareBuild
-          ? { ...localBindingConfig, name: 'apx-ride-portal-staging' }
+          ? {
+              ...localBindingConfig,
+              name: 'apx-ride-portal-staging',
+              workers_dev: false,
+              preview_urls: false,
+              routes: [
+                {
+                  pattern: 'portal-staging.apxride.com',
+                  custom_domain: true,
+                },
+              ],
+              vars: {
+                APX_AUTH_MODE: 'cloudflare',
+                CF_ACCESS_TEAM_DOMAIN: STAGING_ACCESS_TEAM_DOMAIN,
+                CF_ACCESS_AUD: STAGING_ACCESS_AUDIENCE,
+              },
+            }
           : localBindingConfig,
       }),
     ],
