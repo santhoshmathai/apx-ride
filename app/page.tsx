@@ -10,8 +10,8 @@ export default async function Home() {
     const signOutPath = cloudflareAccessLogoutUrl();
     const principal = await getPortalPrincipal();
     if (!principal) return <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-slate-100"><section className="max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-8"><h1 className="text-2xl font-bold">Access not approved</h1><p className="mt-4 text-slate-300">Sign in with your approved Cloudflare Access identity. If this is your first login, ask the APX RIDE owner to provision your exact email address.</p><a className="mt-6 inline-block text-amber-300 underline" href={signOutPath}>Sign out and try another account</a></section></main>;
-    if (principal.role === 'DRIVER') return <DriverDashboard user={principal} signOutPath={signOutPath} />;
-    return <AppShell signOutPath={signOutPath} />;
+    if (principal.role === 'DRIVER') return <DriverDashboard user={principal} signOutPath={signOutPath} environment="Staging" />;
+    return <AppShell signOutPath={signOutPath} account={{ email: principal.email, role: 'Owner/Admin', environment: 'Staging' }} />;
   }
   const user = await getChatGPTUser();
   if (!user) {
@@ -20,5 +20,5 @@ export default async function Home() {
   if (!isApprovedEmail(user.email)) {
     return <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-slate-100"><section className="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-8 shadow-2xl"><p className="mb-2 text-sm font-semibold uppercase tracking-widest text-cyan-400">APX Ride Portal</p><h1 className="text-3xl font-bold">Access not approved</h1><p className="mt-4 leading-7 text-slate-300">The ChatGPT account <strong className="text-white">{user.email}</strong> is not on the tester list. Ask the portal owner to approve this exact email address.</p><a className="mt-6 inline-flex rounded-lg bg-cyan-400 px-4 py-2 font-semibold text-slate-950" href={chatGPTSignOutPath('/')}>Sign out</a></section></main>;
   }
-  return <AppShell signOutPath={chatGPTSignOutPath('/')} />;
+  return <AppShell signOutPath={chatGPTSignOutPath('/')} account={{ email: user.email, role: 'Owner/Admin', environment: 'Sites' }} />;
 }

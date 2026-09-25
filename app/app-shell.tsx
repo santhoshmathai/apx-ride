@@ -107,7 +107,9 @@ const nav = [
 ] as const;
 let activeTimeFormat: '12' | '24' = '24';
 
-export function AppShell({ signOutPath }: { signOutPath: string }) {
+type AccountSummary = { email: string; role: string; environment: string };
+
+export function AppShell({ signOutPath, account }: { signOutPath: string; account: AccountSummary }) {
   const [active, setActive] = useState('Dashboard'),
     [mobile, setMobile] = useState(false),
     [modal, setModal] = useState<Booking | null | undefined>(),
@@ -201,8 +203,8 @@ export function AppShell({ signOutPath }: { signOutPath: string }) {
         select={setActive}
         mobile={mobile}
         close={() => setMobile(false)}
-        operators={operators.length}
         signOutPath={signOutPath}
+        account={account}
       />
       {mobile && <button className="scrim" onClick={() => setMobile(false)} />}
       <section className="workspace">
@@ -303,15 +305,15 @@ function Sidebar({
   select,
   mobile,
   close,
-  operators,
   signOutPath,
+  account,
 }: {
   active: string;
   select: (s: string) => void;
   mobile: boolean;
   close: () => void;
-  operators: number;
   signOutPath: string;
+  account: AccountSummary;
 }) {
   return (
     <aside className={`sidebar ${mobile ? 'open' : ''}`}>
@@ -337,11 +339,12 @@ function Sidebar({
         ))}
       </nav>
       <footer>
-        <i />
-        Secure workspace
-        <strong>
-          {operators} operator{operators === 1 ? '' : 's'}
-        </strong>
+        <div className="workspace-state"><i />Secure workspace</div>
+        <div className="signed-in-account">
+          <small>Signed in as</small>
+          <strong title={account.email}>{account.email}</strong>
+          <span>{account.role} · {account.environment}</span>
+        </div>
         <a className="sidebar-signout" href={signOutPath}><LogOut />Sign out</a>
       </footer>
     </aside>

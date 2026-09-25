@@ -33,8 +33,10 @@ function validTeamDomain(value: string): string | null {
 }
 
 export function cloudflareAccessLogoutUrl(): string {
-  const teamDomain = validTeamDomain(env.CF_ACCESS_TEAM_DOMAIN || '');
-  return teamDomain ? `${teamDomain}/cdn-cgi/access/logout` : '/cdn-cgi/access/logout';
+  // Use the application-domain endpoint. Cloudflare revokes the Access session
+  // from either endpoint, but this one also removes the portal cookie
+  // immediately instead of waiting for token revocation to propagate.
+  return '/cdn-cgi/access/logout';
 }
 
 async function verifyAccessToken(token: string): Promise<AccessClaims | null> {
