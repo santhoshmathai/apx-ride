@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { NextResponse } from 'next/server';
 import { getPortalAdmin } from '../../portal-auth';
+import { validMutationOrigin } from '../../request-security';
 
 async function authorised() {
   const user = await getPortalAdmin();
@@ -25,6 +26,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  if(!validMutationOrigin(req))return NextResponse.json({error:'Invalid request origin'},{status:403});
   const user = await authorised();
   if (!user) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   const body = (await req.json()) as { eventDate?: string; recordType?: string; reference?: string; status?: string; data?: Record<string, unknown> };
@@ -44,6 +46,7 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  if(!validMutationOrigin(req))return NextResponse.json({error:'Invalid request origin'},{status:403});
   const user = await authorised();
   if (!user) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   const body = (await req.json()) as { id: number; eventDate?: string; reference?: string; status?: string; data?: Record<string, unknown> };

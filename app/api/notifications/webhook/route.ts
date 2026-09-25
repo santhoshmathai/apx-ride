@@ -25,9 +25,10 @@ export async function POST(req: Request) {
   const statuses: Record<string, string> = { 'email.sent': 'SENT', 'email.delivered': 'DELIVERED', 'email.delivery_delayed': 'RETRY', 'email.bounced': 'BOUNCED', 'email.complained': 'COMPLAINED', 'email.failed': 'FAILED', 'email.suppressed': 'SUPPRESSED' };
   const status = statuses[event.type || '']; if (!status) return NextResponse.json({ ok: true });
   const detail = event.data?.bounce?.message || event.data?.failed?.reason || event.type || '';
+  const retryAt = status === 'RETRY' ? new Date(Date.now() + 15 * 60 * 1000).toISOString() : '';
   await env.DB.batch([
     env.DB.prepare('INSERT OR IGNORE INTO notification_deliveries(organisation_id,outbox_id,provider,provider_message_id,status,detail,occurred_at,event_id) VALUES(?,?,?,?,?,?,?,?)').bind(row.organisation_id, row.id, 'RESEND', providerId, status, detail.slice(0, 500), event.created_at || new Date().toISOString(), id),
-    env.DB.prepare('UPDATE notification_outbox SET status=?,last_error=? WHERE id=? AND organisation_id=?').bind(status, ['BOUNCED', 'COMPLAINED', 'FAILED', 'SUPPRESSED'].includes(status) ? detail.slice(0, 500) : '', row.id, row.organisation_id),
+    env.DB.prepare('UPDATE notification_outbox SET status=?,last_error=?,next_attempt_at=? WHERE id=? AND organisation_id=?').bind(status, ['BOUNCED', 'COMPLAINED', 'FAILED', 'SUPPRESSED', 'RETRY'].includes(status) ? detail.slice(0, 500) : '', retryAt, row.id, row.organisation_id),
   ]);
   return NextResponse.json({ ok: true });
 }

@@ -4,6 +4,6 @@ This directory contains the current public website as plain, editable HTML, CSS,
 
 The site has no build dependency. To test locally, serve this directory with any static-file server; opening `index.html` directly may behave differently for absolute asset paths. For a future Cloudflare Pages deployment, set the repository root directory to `website` and the output directory to `.` (or deploy these files as static assets). Keep the portal deployment rooted at the repository root.
 
-The booking form in `app.js` currently posts to `https://portal.apxride.com/api/public-booking-requests`, which is still a restricted test endpoint. The Cloudflare migration plan moves that endpoint to a separately protected public API and requires an explicit launch decision before real public bookings. Committing this directory does **not** publish or enable that API.
+The booking form in `app.js` posts to the separately deployed staging gateway at `https://api-staging.apxride.com/api/public-booking-requests`. The gateway applies Turnstile and rate limiting before forwarding the request to the protected portal through a Worker service binding. The checked-in Turnstile key is Cloudflare's published always-pass test key and must be replaced with the production site key during cutover. Committing this directory does **not** publish the website.
 
 Do not commit secrets, customer records, `.openai/hosting.json`, or generated Sites runtime files here. Keep image usage rights and the public content under review before production launch.

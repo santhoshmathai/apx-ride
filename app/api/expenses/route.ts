@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { NextResponse } from 'next/server';
 import { getPortalAdmin } from '../../portal-auth';
+import { validMutationOrigin } from '../../request-security';
 
 async function owner() {
   const user = await getPortalAdmin();
@@ -26,6 +27,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  if(!validMutationOrigin(req))return NextResponse.json({error:'Invalid request origin'},{status:403});
   const auth = await owner();
   if (auth.error) return auth.error;
   const body = (await req.json()) as {
@@ -52,6 +54,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  if(!validMutationOrigin(req))return NextResponse.json({error:'Invalid request origin'},{status:403});
   const auth = await owner();
   if (auth.error) return auth.error;
   const id = Number(new URL(req.url).searchParams.get('id'));

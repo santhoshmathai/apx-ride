@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { NextResponse } from 'next/server';
 import { driverEligibilitySelect, eligibilityReasons, type DriverEligibilityRow } from '../../driver-eligibility';
 import { cloudflareAuthEnabled, getPortalPrincipal } from '../../portal-auth';
+import { validMutationOrigin } from '../../request-security';
 
 type ProfileBody = {
   staffId?: unknown; fullName?: unknown; phone?: unknown; licensingAuthority?: unknown;
@@ -32,6 +33,7 @@ export async function GET(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  if(!validMutationOrigin(req))return NextResponse.json({error:'Invalid request origin'},{status:403});
   const user = await admin();
   if (!user) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   const body = await req.json() as ProfileBody;

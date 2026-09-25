@@ -6,6 +6,7 @@ export const TERMINAL_ASSIGNMENT_STATUSES = ['COMPLETED', 'DRIVER_DECLINED', 'AS
 export type AssignmentRow = {
   id: number; booking_id: number; driver_staff_id: string; status: string; active: number;
   driver_agreed_payment: number; payment_status: string; payment_date: string; payment_notes: string;
+  collection_method: string; collection_status: string; collected_at: string; receipt_number: string;
 };
 
 export async function addAssignmentEvent(row: AssignmentRow, actorEmail: string, toStatus: string, note = '') {

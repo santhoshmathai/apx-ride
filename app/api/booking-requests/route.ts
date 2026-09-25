@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { NextResponse } from 'next/server';
 import { getPortalAdmin } from '../../portal-auth';
 import { sendOutbox } from '../../email-service';
+import { validMutationOrigin } from '../../request-security';
 
 type PortalUser = { userId: string; email: string };
 type RequestRow = Record<string, unknown> & { id: number; status: string; reference: string; passenger_name: string; email: string; phone: string; pickup: string; dropoff: string; pickup_at: string; passengers: number; large_bags: number; small_bags: number; fleet_tier: string; quoted_fare: number; notes: string; assigned_booking_id?: number | null };
@@ -45,6 +46,7 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
+  if(!validMutationOrigin(req))return NextResponse.json({error:'Invalid request origin'},{status:403});
   const user = await authorised();
   if (!user) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   const orgId = await ensureOrganisation(user);
@@ -56,6 +58,7 @@ export async function PUT(req: Request) {
 }
 
 export async function POST(req: Request) {
+  if(!validMutationOrigin(req))return NextResponse.json({error:'Invalid request origin'},{status:403});
   const user = await authorised();
   if (!user) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   const orgId = await ensureOrganisation(user);
@@ -75,6 +78,7 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
+  if(!validMutationOrigin(req))return NextResponse.json({error:'Invalid request origin'},{status:403});
   const user = await authorised();
   if (!user) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   const orgId = await ensureOrganisation(user);

@@ -1,8 +1,20 @@
 import { env } from 'cloudflare:workers';
 import { NextResponse } from 'next/server';
 import { getPortalAdmin } from '../../portal-auth';
+import { validMutationOrigin } from '../../request-security';
 async function authorised() { return getPortalAdmin(); }
-export async function POST(req: Request) { const user = await authorised(); if (!user) return NextResponse.json({ error: 'Access denied' }, { status: 403 }); const form = await req.formData(); const file = form.get('file'); const recordId = Number(form.get('recordId')); const fieldNameValue = form.get('fieldName'); const fieldName = typeof fieldNameValue === 'string' ? fieldNameValue : 'document'; if (!(file instanceof File) || !recordId || !file.size || file.size > 1_000_000) return NextResponse.json({ error: 'A valid PDF, JPG or PNG file up to 1 MB is required' }, { status: 400 }); const record = await env.DB.prepare('SELECT id FROM compliance_records WHERE id=? AND owner_id=?').bind(recordId, user.userId).first(); if (!record) return NextResponse.json({ error: 'Record not found' }, { status: 404 }); const allowed = ['application/pdf','image/jpeg','image/png']; if (!allowed.includes(file.type)) return NextResponse.json({ error: 'Only PDF, JPG and PNG files are accepted' }, { status: 400 }); const key = `${user.userId}/records/${recordId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`; await env.BUCKET.put(key, file.stream(), { httpMetadata: { contentType: file.type } }); const result = await env.DB.prepare('INSERT INTO compliance_documents(owner_id,record_id,field_name,file_name,content_type,object_key,uploaded_at) VALUES(?,?,?,?,?,?,?)').bind(user.userId, recordId, fieldName, file.name, file.type, key, new Date().toISOString()).run(); return NextResponse.json({ id: result.meta.last_row_id, fileName: file.name }, { status: 201 }); }
+export async function POST(req: Request) {
+  if(!validMutationOrigin(req))return NextResponse.json({error:'Invalid request origin'},{status:403});
+  const user=await authorised(); if(!user)return NextResponse.json({error:'Access denied'},{status:403});
+  const form=await req.formData(); const file=form.get('file'); const recordId=Number(form.get('recordId')); const fieldNameValue=form.get('fieldName'); const fieldName=typeof fieldNameValue==='string'?fieldNameValue.slice(0,80):'document';
+  if(!(file instanceof File)||!recordId||!file.size||file.size>1_000_000||file.name.length>180)return NextResponse.json({error:'A valid PDF, JPG or PNG file up to 1 MB is required'},{status:400});
+  const allowed=['application/pdf','image/jpeg','image/png']; if(!allowed.includes(file.type))return NextResponse.json({error:'Only PDF, JPG and PNG files are accepted'},{status:400});
+  const bytes=new Uint8Array(await file.arrayBuffer()); const valid=file.type==='application/pdf'?(bytes[0]===0x25&&bytes[1]===0x50&&bytes[2]===0x44&&bytes[3]===0x46):file.type==='image/png'?(bytes[0]===0x89&&bytes[1]===0x50&&bytes[2]===0x4e&&bytes[3]===0x47):(bytes[0]===0xff&&bytes[1]===0xd8&&bytes[bytes.length-2]===0xff&&bytes[bytes.length-1]===0xd9);
+  if(!valid)return NextResponse.json({error:'The file content does not match its declared type'},{status:400});
+  const record=await env.DB.prepare('SELECT id FROM compliance_records WHERE id=? AND owner_id=?').bind(recordId,user.userId).first(); if(!record)return NextResponse.json({error:'Record not found'},{status:404});
+  const cleanName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_'); const key=`${user.userId}/records/${recordId}/${crypto.randomUUID()}-${cleanName}`; await env.BUCKET.put(key,bytes,{httpMetadata:{contentType:file.type},customMetadata:{originalName:cleanName,uploadedBy:user.email}});
+  const result=await env.DB.prepare('INSERT INTO compliance_documents(owner_id,record_id,field_name,file_name,content_type,object_key,uploaded_at) VALUES(?,?,?,?,?,?,?)').bind(user.userId,recordId,fieldName,cleanName,file.type,key,new Date().toISOString()).run(); return NextResponse.json({id:result.meta.last_row_id,fileName:cleanName},{status:201});
+}
 export async function GET(req: Request) {
   const user = await authorised();
   if (!user) return NextResponse.json({ error: 'Access denied' }, { status: 403 });

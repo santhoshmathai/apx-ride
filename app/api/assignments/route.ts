@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { addAssignmentEvent, scheduleConflicts, transitionAssignment, type AssignmentRow } from '../../assignment-workflow';
 import { driverEligibilitySelect, eligibilityReasons, type DriverEligibilityRow } from '../../driver-eligibility';
 import { cloudflareAuthEnabled, getPortalPrincipal } from '../../portal-auth';
+import { validMutationOrigin } from '../../request-security';
 
 async function admin() { if (!cloudflareAuthEnabled()) return null; const user = await getPortalPrincipal(); return user?.role === 'OWNER_ADMIN' ? user : null; }
 
@@ -18,6 +19,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  if(!validMutationOrigin(req))return NextResponse.json({error:'Invalid request origin'},{status:403});
   const user = await admin(); if (!user) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   const body = await req.json() as { action?: unknown; bookingId?: unknown; driverId?: unknown; assignmentId?: unknown; agreedPayment?: unknown; paymentStatus?: unknown; paymentDate?: unknown; paymentNotes?: unknown; note?: unknown };
   const action = String(body.action || 'OFFER'); const bookingId = Number(body.bookingId); const now = new Date().toISOString();

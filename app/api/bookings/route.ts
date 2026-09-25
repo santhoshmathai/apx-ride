@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { NextResponse } from 'next/server';
 import { getPortalAdmin } from '../../portal-auth';
+import { validMutationOrigin } from '../../request-security';
 
 async function authenticatedOwner(): Promise<string> {
   const user = await getPortalAdmin();
@@ -41,6 +42,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  if(!validMutationOrigin(req))return NextResponse.json({error:'Invalid request origin'},{status:403});
   try {
     const ownerId = await authenticatedOwner();
     await ready();
@@ -85,6 +87,7 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
+  if(!validMutationOrigin(req))return NextResponse.json({error:'Invalid request origin'},{status:403});
   try {
     const ownerId = await authenticatedOwner();
     await ready();
@@ -113,6 +116,7 @@ export async function PATCH(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  if(!validMutationOrigin(req))return NextResponse.json({error:'Invalid request origin'},{status:403});
   try {
     const ownerId = await authenticatedOwner();
     await ready();
@@ -155,6 +159,7 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  if(!validMutationOrigin(req))return NextResponse.json({error:'Invalid request origin'},{status:403});
   try {
     const ownerId = await authenticatedOwner();
     await ready();

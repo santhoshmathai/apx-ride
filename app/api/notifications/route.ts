@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { NextResponse } from 'next/server';
 import { getPortalAdmin } from '../../portal-auth';
 import { emailConfigured, processDueOutbox, sendOutbox, webhookConfigured } from '../../email-service';
+import { validMutationOrigin } from '../../request-security';
 
 async function current() { return getPortalAdmin(); }
 function org(userId: string) { return `org_${userId}`; }
@@ -15,6 +16,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  if(!validMutationOrigin(req))return NextResponse.json({error:'Invalid request origin'},{status:403});
   const user = await current(); if (!user) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   const organisationId = org(user.userId); const body = await req.json() as { action?: string; id?: number };
   if (body.action === 'PROCESS') return NextResponse.json({ results: await processDueOutbox(organisationId) });
@@ -23,6 +25,7 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  if(!validMutationOrigin(req))return NextResponse.json({error:'Invalid request origin'},{status:403});
   const user = await current(); if (!user) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   const body = await req.json() as Record<string, unknown>;
   const clean = (value: unknown, fallback: string) => typeof value === 'string' && value.trim() ? value.trim().slice(0, 240) : fallback;

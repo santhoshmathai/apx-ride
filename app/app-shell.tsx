@@ -701,6 +701,7 @@ function Bookings({
   ).filter((b) => tab !== 'complete' || ((!from || b.pickup_at.slice(0, 10) >= from) && (!to || b.pickup_at.slice(0, 10) <= to)))
     .sort((a, b) => a.pickup_at.localeCompare(b.pickup_at));
   const shown = tab === 'complete' ? filtered.slice((page - 1) * 10, page * 10) : filtered;
+  const sendInvoice = async (booking: Booking) => { if (!confirm(`Send formal invoice to ${booking.customer_email || 'the customer email on this booking'}?`)) return; const response=await fetch('/api/invoices',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bookingId:booking.id})}); const value=await response.json() as {error?:string;status?:string}; if(!response.ok&&response.status!==202){alert(value.error||'Invoice could not be sent');return;} alert(`Invoice ${value.status==='SENT'?'sent':'queued for delivery'}.`); };
   return (
     <Page
       title="Booking control"
@@ -755,6 +756,7 @@ function Bookings({
                 <Eye />
               </button>
               {b.status === 'complete' && <button className="invoice-action" onClick={() => printTripInvoice(b)} title="Generate trip invoice"><FileText /><span>Invoice</span></button>}
+              {b.status === 'complete' && <button className="invoice-action" onClick={() => void sendInvoice(b)} title="Email formal invoice"><Mail /><span>Email invoice</span></button>}
               {b.status !== 'complete' && <button onClick={() => edit(b)} title="Edit booking"><Pencil /></button>}
               {b.status !== 'complete' && <button onClick={() => setAssigning(b)} title="Assignment and Driver payment"><UsersRound /><span>Assign</span></button>}
               {b.status !== 'complete' && <button onClick={() => setMessaging(b)} title="Message passenger"><Mail /></button>}
