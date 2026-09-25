@@ -38,3 +38,20 @@ export async function PATCH(req: Request) {
   await env.DB.prepare('INSERT INTO audit_events(owner_id,actor_email,action,entity_type,entity_id,summary,created_at) VALUES(?,?,?,?,?,?,?)').bind(user.ownerId, user.email, body.active ? 'ENABLE_DRIVER' : 'DISABLE_DRIVER', 'portal_staff', body.id, body.active ? 'Driver enabled' : 'Driver disabled', now).run();
   return NextResponse.json({ ok: true });
 }
+
+export async function DELETE(req: Request) {
+  if (!cloudflareAuthEnabled()) return NextResponse.json({ error: 'Not available in Sites mode' }, { status: 404 });
+  const user = await getPortalPrincipal();
+  if (!user || user.role !== 'OWNER_ADMIN') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  const id = new URL(req.url).searchParams.get('id');
+  if (!id) return NextResponse.json({ error: 'Driver ID required' }, { status: 400 });
+  const member = await env.DB.prepare("SELECT id,email,active,access_subject FROM portal_staff WHERE id=? AND organisation_id=? AND owner_id=? AND role='DRIVER'").bind(id, user.organisationId, user.ownerId).first<{ id: string; email: string; active: number; access_subject: string | null }>();
+  if (!member) return NextResponse.json({ error: 'Driver not found' }, { status: 404 });
+  if (member.active) return NextResponse.json({ error: 'Disable the Driver before deleting them' }, { status: 409 });
+  if (member.access_subject) return NextResponse.json({ error: 'A Driver who has logged in must be retained as a disabled historical record' }, { status: 409 });
+  const result = await env.DB.prepare("DELETE FROM portal_staff WHERE id=? AND organisation_id=? AND owner_id=? AND role='DRIVER' AND active=0 AND access_subject IS NULL AND NOT EXISTS (SELECT 1 FROM bookings WHERE assigned_driver_user_id=?)").bind(id, user.organisationId, user.ownerId, id).run();
+  if (result.meta.changes !== 1) return NextResponse.json({ error: 'This Driver has assignment history and must be retained as disabled' }, { status: 409 });
+  const now = new Date().toISOString();
+  await env.DB.prepare('INSERT INTO audit_events(owner_id,actor_email,action,entity_type,entity_id,summary,created_at) VALUES(?,?,?,?,?,?,?)').bind(user.ownerId, user.email, 'DELETE_UNUSED_DRIVER', 'portal_staff', id, `Deleted unused Driver ${member.email}`, now).run();
+  return NextResponse.json({ ok: true });
+}

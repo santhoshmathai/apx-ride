@@ -49,7 +49,9 @@
 .staff-badges .active, .staff-badges .verified { border-color: #39664a; color: #78cb98; }
 .staff-badges .inactive { border-color: #733d41; color: #e68e94; }
 .staff-badges .pending { border-color: #755f2a; color: #e4bd55; }
-.staff-row > button { border: 1px solid #555; border-radius: 8px; background: transparent; color: #ddd; padding: 8px 11px; }
+.staff-row-actions { display: flex; gap: 7px; }
+.staff-row-actions button { border: 1px solid #555; border-radius: 8px; background: transparent; color: #ddd; padding: 8px 11px; }
+.staff-row-actions button.danger { border-color: #74363b; color: #ef999f; }
 .next-job-preview,
 .today-job-list button {
   display: grid;
@@ -274,6 +276,7 @@
   .staff-add-card form { align-items: stretch; flex-direction: column; }
   .staff-row { align-items: stretch; grid-template-columns: 1fr; }
   .staff-badges { justify-content: flex-start; }
+  .staff-row-actions { flex-wrap: wrap; }
   .dashboard-hero + .stats {
     margin-top: 16px;
   }

@@ -50,6 +50,19 @@ export function StaffAccess() {
     finally { setSaving(false); }
   }
 
+  async function deleteUnusedDriver(member: StaffMember) {
+    if (!confirm(`Permanently delete the unused Driver ${member.email}? This is allowed only because the Driver is disabled, has never logged in and has no assigned jobs.`)) return;
+    setSaving(true); setError(''); setNotice('');
+    try {
+      const response = await fetch(`/api/staff?id=${encodeURIComponent(member.id)}`, { method: 'DELETE', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      const value = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(value.error || 'Could not delete Driver');
+      setNotice(`${member.email} was permanently deleted. Remove the email from Cloudflare Access too if it was added there.`);
+      await refresh();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not delete Driver'); }
+    finally { setSaving(false); }
+  }
+
   const owners = staff.filter((member) => member.role === 'OWNER_ADMIN' && member.active).length;
   const activeDrivers = staff.filter((member) => member.role === 'DRIVER' && member.active).length;
   const inactiveDrivers = staff.filter((member) => member.role === 'DRIVER' && !member.active).length;
@@ -61,6 +74,6 @@ export function StaffAccess() {
       <article className="panel staff-security-note"><CircleAlert /><div><h3>Two controls are required</h3><p>Cloudflare authenticates the named person. The portal membership decides whether they are an Owner/Admin or Driver. Adding an email in only one place never grants complete access.</p></div></article>
     </div>
     {error && <p className="staff-message error" role="alert">{error}</p>}{notice && <p className="staff-message success"><CheckCircle2 />{notice}</p>}
-    <article className="panel staff-list-card"><div className="head"><small>AUTHORISED STAFF</small><h3>Portal memberships</h3></div>{loading ? <p>Loading staff…</p> : <div className="staff-list">{staff.map((member) => <div className="staff-row" key={member.id}><div><strong>{member.email}</strong><span>{member.role === 'OWNER_ADMIN' ? 'Owner/Admin' : 'Driver'} · Added {new Date(member.created_at).toLocaleDateString('en-GB')}</span></div><div className="staff-badges"><span className={member.active ? 'active' : 'inactive'}>{member.active ? 'Active' : 'Disabled'}</span><span className={member.identity_verified ? 'verified' : 'pending'}>{member.identity_verified ? 'Identity verified' : 'Awaiting first login'}</span></div>{member.role === 'DRIVER' && <button disabled={saving} onClick={() => void setActive(member, !member.active)}>{member.active ? 'Disable' : 'Reactivate'}</button>}</div>)}</div>}</article>
+    <article className="panel staff-list-card"><div className="head"><small>AUTHORISED STAFF</small><h3>Portal memberships</h3></div>{loading ? <p>Loading staff…</p> : <div className="staff-list">{staff.map((member) => <div className="staff-row" key={member.id}><div><strong>{member.email}</strong><span>{member.role === 'OWNER_ADMIN' ? 'Owner/Admin' : 'Driver'} · Added {new Date(member.created_at).toLocaleDateString('en-GB')}</span></div><div className="staff-badges"><span className={member.active ? 'active' : 'inactive'}>{member.active ? 'Active' : 'Disabled'}</span><span className={member.identity_verified ? 'verified' : 'pending'}>{member.identity_verified ? 'Identity verified' : 'Awaiting first login'}</span></div>{member.role === 'DRIVER' && <div className="staff-row-actions"><button disabled={saving} onClick={() => void setActive(member, !member.active)}>{member.active ? 'Disable' : 'Reactivate'}</button>{!member.active && !member.identity_verified && <button className="danger" disabled={saving} onClick={() => void deleteUnusedDriver(member)}>Delete</button>}</div>}</div>)}</div>}</article>
   </section>;
 }
