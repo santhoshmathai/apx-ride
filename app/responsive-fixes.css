@@ -72,6 +72,49 @@
 .private-document-note { padding: 12px; border-left: 3px solid #b8912f; background: #1b180f; color: #aaa; font-size: .72rem; line-height: 1.5; }
 .approval-control { display: grid; gap: 6px; margin: 14px 0 20px; }
 .approval-control small { color: #929598; }
+.driver-workspace { min-height: 100vh; display: grid; grid-template-columns: 240px 1fr; background: #080a0b; color: #eee; }
+.driver-workspace aside { position: sticky; top: 0; height: 100vh; display: grid; grid-template-rows: auto 1fr auto; padding: 20px; border-right: 1px solid #292c2f; background: #0d0f10; }
+.driver-workspace aside header { display: flex; align-items: center; justify-content: space-between; }
+.driver-workspace aside header img { width: 88px; border-radius: 50%; }
+.driver-workspace aside header button, .driver-top > button { display: none; }
+.driver-workspace aside nav { display: grid; align-content: start; gap: 7px; margin-top: 28px; }
+.driver-workspace aside nav button { display: flex; align-items: center; gap: 10px; padding: 12px; border: 0; border-radius: 8px; background: transparent; color: #a6a9ac; text-align: left; }
+.driver-workspace aside nav button.active { background: #272216; color: #efc34d; }
+.driver-workspace aside nav svg, .driver-workspace aside footer svg { width: 17px; }
+.driver-workspace aside footer { display: grid; gap: 6px; min-width: 0; border-top: 1px solid #292c2f; padding-top: 16px; }
+.driver-workspace aside footer strong { overflow-wrap: anywhere; font-size: .72rem; }
+.driver-workspace aside footer span { color: #85898c; font-size: .65rem; }
+.driver-workspace aside footer a { display: flex; align-items: center; gap: 7px; margin-top: 8px; color: #e4bd55; text-decoration: none; font-size: .72rem; }
+.driver-main { min-width: 0; padding: 24px clamp(16px,4vw,54px) 50px; }
+.driver-top { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 22px; padding-bottom: 16px; border-bottom: 1px solid #292c2f; }
+.driver-top small { color: #d8aa2d; font-size: .65rem; font-weight: 800; letter-spacing: .13em; }
+.driver-top h1 { margin: 4px 0 0; font-size: 1.8rem; }
+.driver-top > span { max-width: 300px; overflow-wrap: anywhere; color: #a0a3a5; font-size: .72rem; }
+.driver-stack { display: grid; gap: 14px; }
+.driver-card { padding: 20px; border: 1px solid #292c2f; border-radius: 13px; background: #121416; }
+.driver-card > h2 { margin: 0 0 6px; }.driver-card > p { color: #999da0; }
+.driver-stats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+.driver-stats article { display: grid; gap: 8px; padding: 17px; border: 1px solid #303337; border-radius: 10px; background: #111315; }
+.driver-stats span { color: #939699; font-size: .7rem; }.driver-stats strong { color: #efc75b; font-size: 1.5rem; }
+.driver-jobs { display: grid; gap: 10px; margin-top: 15px; }
+.driver-jobs > article { padding: 15px; border: 1px solid #303337; border-radius: 10px; background: #0d0f10; }
+.driver-jobs article > header { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+.driver-jobs h3 { margin: 4px 0; font-size: .9rem; }.driver-jobs small { color: #85898c; }.driver-jobs header > span { color: #e1ba50; font-size: .68rem; font-weight: 800; }
+.driver-jobs article > p { color: #a2a5a7; font-size: .72rem; line-height: 1.45; }.driver-jobs .driver-payment { color: #e4bd55; }
+.driver-job-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.driver-job-actions button, .driver-job-actions a, .driver-calendar-head button, .driver-availability-form button { padding: 8px 10px; border: 1px solid #725e24; border-radius: 7px; background: #201c11; color: #efc75b; text-decoration: none; font-size: .68rem; }
+.driver-alert { padding: 13px; border: 1px solid #733d41; border-radius: 9px; background: #291719; color: #efa1a6; }.driver-success { padding: 13px; border: 1px solid #39664a; border-radius: 9px; background: #15271c; color: #86d0a1 !important; }.driver-empty { padding: 20px; color: #898c8e; text-align: center; }
+.driver-calendar-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }.driver-calendar-head h2 { margin: 0; }
+.driver-calendar { display: grid; grid-template-columns: repeat(7,minmax(80px,1fr)); gap: 6px; margin: 18px 0; overflow-x: auto; }
+.driver-calendar > i, .driver-calendar > button { min-height: 92px; }.driver-calendar > button { display: grid; align-content: start; gap: 5px; padding: 8px; border: 1px solid #303337; border-radius: 7px; background: #0d0f10; color: #eee; text-align: left; }.driver-calendar > button.selected { border-color: #c69c2f; }.driver-calendar small { overflow: hidden; color: #d6b24e; font-size: .6rem; text-overflow: ellipsis; white-space: nowrap; }
+.driver-availability-form { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; margin: 18px 0; }.driver-availability-form label { color: #aaa; font-size: .7rem; }.driver-availability-form input { width: 100%; margin-top: 5px; }.driver-availability-form .check-label { align-self: end; padding: 12px; }.driver-availability-form button { align-self: end; min-height: 42px; }
+.driver-table { display: grid; gap: 7px; margin-top: 16px; }.driver-table > div { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 12px; padding: 12px; border: 1px solid #303337; border-radius: 8px; }.driver-table span,.driver-table em { color: #999; font-size: .7rem; }.driver-table em { font-style: normal; }.driver-table button { color: #e58e94; }
+.driver-profile { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }.driver-profile div { padding: 12px; border: 1px solid #303337; border-radius: 8px; }.driver-profile dt { color: #888; font-size: .65rem; text-transform: uppercase; }.driver-profile dd { margin: 5px 0 0; overflow-wrap: anywhere; }
+.assignment-modal > header p { margin: 4px 0 0; color: #999; font-size: .72rem; }
+.assignment-offer { display: grid; grid-template-columns: 1.4fr .7fr; gap: 11px; margin: 18px 0; }.assignment-offer label { color: #999; font-size: .72rem; }.assignment-offer input,.assignment-offer select,.assignment-offer textarea { width: 100%; margin-top: 6px; }.assignment-offer .wide { grid-column: 1 / -1; }.assignment-offer button { justify-self: start; }
+.assignment-driver-status { display: grid; gap: 7px; margin: 15px 0; }.assignment-driver-status details { padding: 10px 12px; border: 1px solid #303337; border-radius: 8px; color: #aaa; font-size: .72rem; }.assignment-driver-status summary { cursor: pointer; color: #ddd; }.assignment-driver-status ul { margin-bottom: 0; }
+.assignment-history { display: grid; gap: 8px; }.assignment-history article { display: grid; grid-template-columns: minmax(180px,1fr) auto auto auto; align-items: center; gap: 10px; padding: 12px; border: 1px solid #303337; border-radius: 8px; }.assignment-history article > div { display: grid; gap: 3px; }.assignment-history span { color: #929598; font-size: .68rem; }.assignment-history strong { color: #e4bd55; font-size: .68rem; }.assignment-history button { padding: 7px; border: 1px solid #55491f; border-radius: 6px; background: #1d1a11; color: #e4bd55; font-size: .65rem; }
+.assignment-timeline { display: grid; gap: 0; }.assignment-timeline > div { display: grid; grid-template-columns: 145px 190px 1fr; gap: 10px; padding: 9px 0; border-bottom: 1px solid #292c2f; font-size: .68rem; }.assignment-timeline time,.assignment-timeline span { color: #929598; }.assignment-timeline b { color: #d9b54e; }
 .next-job-preview,
 .today-job-list button {
   display: grid;
@@ -299,6 +342,15 @@
   .staff-row-actions { flex-wrap: wrap; }
   .staff-summary { align-items: flex-start; flex-direction: column; gap: 12px; }
   .onboarding-status { grid-template-columns: 1fr; }
+  .driver-workspace { grid-template-columns: 1fr; }
+  .driver-workspace aside { position: fixed; z-index: 20; width: min(280px,88vw); transform: translateX(-105%); transition: transform .2s ease; }
+  .driver-workspace aside.open { transform: translateX(0); box-shadow: 20px 0 50px #000b; }
+  .driver-workspace aside header button, .driver-top > button { display: inline-flex; }
+  .driver-main { padding: 15px; }.driver-top > span { display: none; }
+  .driver-stats, .driver-profile, .driver-availability-form { grid-template-columns: 1fr; }
+  .driver-table > div { grid-template-columns: 1fr auto; }.driver-table em { grid-column: 1 / -1; }
+  .driver-calendar { grid-template-columns: repeat(7,minmax(105px,1fr)); }
+  .assignment-offer { grid-template-columns: 1fr; }.assignment-offer .wide { grid-column: auto; }.assignment-history article,.assignment-timeline > div { grid-template-columns: 1fr; }
   .dashboard-hero + .stats {
     margin-top: 16px;
   }

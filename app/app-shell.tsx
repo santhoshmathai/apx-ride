@@ -687,8 +687,8 @@ function Bookings({
   messageTemplates: MessageTemplates;
 }) {
   const [tab, setTab] = useState<'active' | 'progress' | 'complete'>('active');
-  const [finishing, setFinishing] = useState<Booking | null>(null),
-    [messaging, setMessaging] = useState<Booking | null>(null),
+  const [messaging, setMessaging] = useState<Booking | null>(null),
+    [assigning, setAssigning] = useState<Booking | null>(null),
     [from, setFrom] = useState(''),
     [to, setTo] = useState(''),
     [page, setPage] = useState(1);
@@ -756,20 +756,7 @@ function Bookings({
               </button>
               {b.status === 'complete' && <button className="invoice-action" onClick={() => printTripInvoice(b)} title="Generate trip invoice"><FileText /><span>Invoice</span></button>}
               {b.status !== 'complete' && <button onClick={() => edit(b)} title="Edit booking"><Pencil /></button>}
-              {b.status === 'upcoming' && (
-                <button
-                  onClick={() => done(b.id, 'in_progress')}
-                  title="Move to In Progress / En Route"
-                >
-                  En route
-                </button>
-              )}
-              {b.status === 'in_progress' && (
-                <button onClick={() => setFinishing(b)} title="Finish job">
-                  <Check />
-                  Finish
-                </button>
-              )}
+              {b.status !== 'complete' && <button onClick={() => setAssigning(b)} title="Assignment and Driver payment"><UsersRound /><span>Assign</span></button>}
               {b.status !== 'complete' && <button onClick={() => setMessaging(b)} title="Message passenger"><Mail /></button>}
               {b.status !== 'complete' && <button onClick={() => remove(b.id)} title="Remove"><Trash2 /></button>}
             </div>
@@ -777,20 +764,27 @@ function Bookings({
         ))}
       </div>
       {tab === 'complete' && filtered.length > 10 && <div className="pager"><button disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</button><span>Showing {(page - 1) * 10 + 1}–{Math.min(page * 10, filtered.length)} of {filtered.length}</span><button disabled={page * 10 >= filtered.length} onClick={() => setPage(page + 1)}>Next</button></div>}
-      {finishing && (
-        <PaymentModal
-          booking={finishing}
-          close={() => setFinishing(null)}
-          confirm={(method) => {
-            done(finishing.id, 'complete', method);
-            setFinishing(null);
-            setTab('complete');
-          }}
-        />
-      )}
       {messaging && <QuickMessage booking={messaging} templates={messageTemplates} close={() => setMessaging(null)} />}
+      {assigning && <AssignmentManager booking={assigning} close={() => setAssigning(null)} />}
     </Page>
   );
+}
+
+type AssignmentDriver = { id: string; email: string; full_name?: string; eligible: boolean; eligibility_reasons: string[]; conflicts: string[] };
+type AssignmentHistory = { id: number; status: string; active: number; email: string; full_name?: string; registration?: string; driver_agreed_payment: number; payment_status: string; payment_date: string; payment_notes: string; offered_at: string };
+type AssignmentEvent = { id: number; actor_email: string; from_status: string; to_status: string; note: string; created_at: string };
+function AssignmentManager({ booking, close }: { booking: Booking; close: () => void }) {
+  const [drivers, setDrivers] = useState<AssignmentDriver[]>([]); const [history, setHistory] = useState<AssignmentHistory[]>([]); const [events, setEvents] = useState<AssignmentEvent[]>([]); const [error, setError] = useState(''); const [saving, setSaving] = useState(false);
+  const refresh = async () => { const response = await fetch(`/api/assignments?bookingId=${booking.id}`); const value = await response.json() as { drivers?: AssignmentDriver[]; history?: AssignmentHistory[]; events?: AssignmentEvent[]; error?: string }; if (!response.ok) { setError(value.error || 'Could not load assignments'); return; } setDrivers(value.drivers || []); setHistory(value.history || []); setEvents(value.events || []); };
+  useEffect(() => { void refresh(); }, [booking.id]);
+  async function post(payload: Record<string, unknown>) { setSaving(true); setError(''); const response = await fetch('/api/assignments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bookingId:booking.id,...payload})}); const value=await response.json() as {error?:string;conflicts?:string[]}; setSaving(false); if(!response.ok){setError([value.error,...(value.conflicts||[])].filter(Boolean).join(' · '));return;} await refresh(); }
+  async function offer(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const data=new FormData(event.currentTarget); await post({action:'OFFER',driverId:data.get('driverId'),agreedPayment:data.get('agreedPayment'),note:data.get('note')}); }
+  const current=history.find((item)=>item.active);
+  return <div className="modal"><button className="scrim" onClick={close}/><section className="record-modal assignment-modal"><header><div><small>AUDITABLE ASSIGNMENT</small><h2>APX-{String(booking.id).padStart(5,'0')}</h2><p>Customer fare £{booking.fare.toFixed(2)} · Driver payment is managed separately</p></div><button onClick={close}><X/></button></header>{error&&<p className="staff-message error">{error}</p>}
+    {!current&&<form className="assignment-offer" onSubmit={offer}><label>Eligible Driver<select name="driverId" required defaultValue=""><option value="" disabled>Select Driver</option>{drivers.map((driver)=><option key={driver.id} value={driver.id} disabled={!driver.eligible||driver.conflicts.length>0}>{driver.full_name||driver.email}{!driver.eligible?' — compliance blocked':driver.conflicts.length?' — schedule conflict':''}</option>)}</select></label><label>Driver agreed payment (£)<input name="agreedPayment" type="number" min="0" step="0.01" required/></label><label className="wide">Offer note<textarea name="note" rows={2}/></label><button className="primary" disabled={saving}>Offer to Driver</button></form>}
+    <div className="assignment-driver-status">{drivers.map((driver)=><details key={driver.id}><summary>{driver.full_name||driver.email} · {driver.eligible?'Compliance eligible':'Not eligible'}{driver.conflicts.length?` · ${driver.conflicts.length} conflict(s)`:''}</summary>{driver.eligibility_reasons.length>0&&<ul>{driver.eligibility_reasons.map((reason)=><li key={reason}>{reason}</li>)}</ul>}{driver.conflicts.length>0&&<ul>{driver.conflicts.map((conflict)=><li key={conflict}>{conflict}</li>)}</ul>}</details>)}</div>
+    <h3>Assignment history</h3><div className="assignment-history">{history.map((item)=><article key={item.id}><div><b>{item.full_name||item.email}</b><span>{item.registration||'Vehicle pending'} · Offered {new Date(item.offered_at).toLocaleString('en-GB')}</span></div><strong>{item.status.replaceAll('_',' ')}</strong><span>Driver £{Number(item.driver_agreed_payment).toFixed(2)} · {item.payment_status}</span>{item.status==='ACKNOWLEDGED'&&<button onClick={()=>void post({action:'CONFIRM',assignmentId:item.id})}>Confirm assignment</button>}{['ASSIGNED','EN_ROUTE','ARRIVED','PASSENGER_ONBOARD'].includes(item.status)&&<button onClick={()=>void post({action:'ADMIN_NEXT',assignmentId:item.id})}>Advance status</button>}{item.active&&<button onClick={()=>void post({action:'REASSIGN',assignmentId:item.id})}>Reassign</button>}{item.active&&<button onClick={()=>void post({action:'CANCEL',assignmentId:item.id,note:'Cancelled by Admin'})}>Cancel assignment</button>}{item.active&&<button onClick={()=>void post({action:'CUSTOMER_CANCEL',assignmentId:item.id,note:'Customer cancelled'})}>Customer cancelled</button>}<button onClick={()=>{const payment=prompt('Driver agreed payment',String(item.driver_agreed_payment));if(payment===null)return;const status=prompt('Payment status: PENDING, APPROVED or PAID',item.payment_status);if(!status)return;const notes=prompt('Payment note/reference',item.payment_notes||'')||'';void post({action:'PAYMENT',assignmentId:item.id,agreedPayment:payment,paymentStatus:status,paymentNotes:notes});}}>Update Driver payment</button></article>)}{!history.length&&<p>No assignment history yet.</p>}</div><h3>Audit timeline</h3><div className="assignment-timeline">{events.map((event)=><div key={event.id}><time>{new Date(event.created_at).toLocaleString('en-GB')}</time><b>{event.from_status?`${event.from_status} → `:''}{event.to_status}</b><span>{event.actor_email}{event.note?` · ${event.note}`:''}</span></div>)}</div>
+  </section></div>;
 }
 
 function QuickMessage({ booking, templates, close }: { booking: Booking; templates: MessageTemplates; close: () => void }) {
@@ -1473,9 +1467,6 @@ function BookingModal({
               <option>ACCOUNT</option>
             </select>
           </label>
-          <label>Driver call sign<input name="driverCallSign" defaultValue={booking?.driver_call_sign || ''} /></label>
-          <label>Driver name<input name="driverName" defaultValue={booking?.driver_name || ''} /></label>
-          <label>Driver licence number<input name="driverLicence" defaultValue={booking?.driver_licence || ''} /></label>
           <label>
             Passengers
             <input

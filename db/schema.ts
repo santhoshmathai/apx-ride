@@ -31,6 +31,52 @@ export const bookings = sqliteTable('bookings', {
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });
+
+export const bookingAssignments = sqliteTable('booking_assignments', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  ownerId: text('owner_id').notNull(),
+  organisationId: text('organisation_id').notNull(),
+  bookingId: integer('booking_id').notNull(),
+  driverStaffId: text('driver_staff_id').notNull(),
+  status: text('status').notNull().default('OFFERED'),
+  active: integer('active').notNull().default(1),
+  driverAgreedPayment: real('driver_agreed_payment').notNull().default(0),
+  paymentStatus: text('payment_status').notNull().default('PENDING'),
+  paymentDate: text('payment_date').notNull().default(''),
+  paymentNotes: text('payment_notes').notNull().default(''),
+  offeredAt: text('offered_at').notNull(),
+  acknowledgedAt: text('acknowledged_at').notNull().default(''),
+  assignedAt: text('assigned_at').notNull().default(''),
+  completedAt: text('completed_at').notNull().default(''),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => [index('idx_booking_assignments_booking').on(table.ownerId, table.bookingId), index('idx_booking_assignments_driver').on(table.driverStaffId, table.active)]);
+
+export const assignmentEvents = sqliteTable('assignment_events', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  ownerId: text('owner_id').notNull(),
+  assignmentId: integer('assignment_id').notNull(),
+  bookingId: integer('booking_id').notNull(),
+  driverStaffId: text('driver_staff_id').notNull(),
+  actorEmail: text('actor_email').notNull(),
+  fromStatus: text('from_status').notNull().default(''),
+  toStatus: text('to_status').notNull(),
+  note: text('note').notNull().default(''),
+  createdAt: text('created_at').notNull(),
+}, (table) => [index('idx_assignment_events_assignment').on(table.ownerId, table.assignmentId)]);
+
+export const driverAvailability = sqliteTable('driver_availability', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  ownerId: text('owner_id').notNull(),
+  organisationId: text('organisation_id').notNull(),
+  driverStaffId: text('driver_staff_id').notNull(),
+  unavailableDate: text('unavailable_date').notNull(),
+  fullDay: integer('full_day').notNull().default(1),
+  startTime: text('start_time').notNull().default(''),
+  endTime: text('end_time').notNull().default(''),
+  reason: text('reason').notNull().default(''),
+  createdAt: text('created_at').notNull(),
+}, (table) => [index('idx_driver_availability').on(table.driverStaffId, table.unavailableDate)]);
 export const settings = sqliteTable('settings', {
   ownerId: text('owner_id').primaryKey(),
   fareModel: text('fare_model').notNull().default('A'),
