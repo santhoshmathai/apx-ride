@@ -20,6 +20,36 @@
 .signed-in-account small { color: #777b7f; font-size: .62rem; text-transform: uppercase; letter-spacing: .08em; }
 .signed-in-account strong { overflow: hidden; color: #f1f1f1; font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
 .signed-in-account span { color: #9a9da0; font-size: .66rem; }
+.staff-access-page h2 { margin: 5px 0; font-size: 1.7rem; }
+.staff-access-page .register-head p, .staff-security-note p { color: #96999c; }
+.staff-stats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; margin: 20px 0 14px; }
+.staff-stats article { display: flex; align-items: center; justify-content: space-between; padding: 18px; border: 1px solid #292c2f; border-radius: 12px; background: #141618; }
+.staff-stats span { color: #919497; font-size: .76rem; }
+.staff-stats strong { color: #efc75b; font-size: 1.7rem; }
+.staff-grid { display: grid; grid-template-columns: minmax(0,1.25fr) minmax(280px,.75fr); gap: 14px; margin-bottom: 14px; }
+.staff-add-card form { display: flex; align-items: end; gap: 10px; margin: 18px 0; }
+.staff-add-card label { flex: 1; color: #999; font-size: .72rem; }
+.staff-add-card input { display: block; width: 100%; height: 40px; margin-top: 7px; padding: 0 11px; border: 1px solid #34373a; border-radius: 8px; background: #0d0f10; color: #eee; }
+.staff-checklist { margin: 15px 0 0; padding-left: 20px; color: #999; font-size: .75rem; line-height: 1.7; }
+.staff-security-note { display: flex; gap: 14px; align-items: flex-start; }
+.staff-security-note > svg { flex: 0 0 auto; color: #e4b940; }
+.staff-security-note h3 { margin-top: 0; }
+.staff-message { display: flex; align-items: flex-start; gap: 9px; padding: 13px; border-radius: 9px; font-size: .78rem; }
+.staff-message svg { width: 18px; flex: 0 0 auto; }
+.staff-message.success { border: 1px solid #315d44; background: #15271c; color: #99d4ae; }
+.staff-message.error { border: 1px solid #74363a; background: #291719; color: #ef9da2; }
+.staff-list-card { margin-top: 14px; }
+.staff-list { display: grid; gap: 9px; margin-top: 16px; }
+.staff-row { display: grid; grid-template-columns: minmax(220px,1fr) auto auto; align-items: center; gap: 14px; padding: 14px; border: 1px solid #292c2f; border-radius: 10px; background: #101214; }
+.staff-row > div:first-child { display: grid; min-width: 0; gap: 4px; }
+.staff-row > div:first-child strong { overflow: hidden; text-overflow: ellipsis; }
+.staff-row > div:first-child span { color: #8d9093; font-size: .7rem; }
+.staff-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.staff-badges span { padding: 4px 8px; border: 1px solid #4d5154; border-radius: 99px; font-size: .65rem; }
+.staff-badges .active, .staff-badges .verified { border-color: #39664a; color: #78cb98; }
+.staff-badges .inactive { border-color: #733d41; color: #e68e94; }
+.staff-badges .pending { border-color: #755f2a; color: #e4bd55; }
+.staff-row > button { border: 1px solid #555; border-radius: 8px; background: transparent; color: #ddd; padding: 8px 11px; }
 .next-job-preview,
 .today-job-list button {
   display: grid;
@@ -240,6 +270,10 @@
 }
 
 @media (max-width: 760px) {
+  .staff-stats, .staff-grid { grid-template-columns: 1fr; }
+  .staff-add-card form { align-items: stretch; flex-direction: column; }
+  .staff-row { align-items: stretch; grid-template-columns: 1fr; }
+  .staff-badges { justify-content: flex-start; }
   .dashboard-hero + .stats {
     margin-top: 16px;
   }

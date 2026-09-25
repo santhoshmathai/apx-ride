@@ -26,10 +26,12 @@ import {
   Printer,
   Save,
   Trash2,
+  UsersRound,
   X,
 } from 'lucide-react';
 import { RecordsHub } from './records-hub';
 import { BookingRequests } from './booking-requests';
+import { StaffAccess } from './staff-access';
 
 type Booking = {
   id: number;
@@ -103,6 +105,7 @@ const nav = [
   ['Messages', MessageSquareText],
   ['Records Hub', FolderLock],
   ['Earnings', PoundSterling],
+  ['Staff & Access', UsersRound],
   ['Settings', Settings],
 ] as const;
 let activeTimeFormat: '12' | '24' = '24';
@@ -267,6 +270,7 @@ export function AppShell({ signOutPath, account }: { signOutPath: string; accoun
           {active === 'Messages' && <Messages items={bookings} templates={messageTemplates} saveTemplates={saveMessageTemplates} />}
           {active === 'Records Hub' && <RecordsHub />}
           {active === 'Earnings' && <EarningsV2 items={bookings} status={status} />}
+          {active === 'Staff & Access' && <StaffAccess />}
           {active === 'Settings' && (
             <SettingsPage
               operators={operators}
