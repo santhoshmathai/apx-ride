@@ -12,7 +12,7 @@ export type PortalPrincipal = {
   role: PortalRole;
 };
 
-type StaffRow = { id: string; owner_id: string; organisation_id: string; email: string; role: string; access_subject: string | null; active: number };
+type StaffRow = { id: string; owner_id: string; organisation_id: string; email: string; role: string; access_subject: string | null; last_login_at: string | null; active: number };
 type AccessClaims = { sub: string; email: string; aud: string[]; iss: string; exp: number; nbf?: number; iat?: number };
 
 export function cloudflareAuthEnabled(): boolean {
@@ -76,11 +76,15 @@ export async function getPortalPrincipal(): Promise<PortalPrincipal | null> {
   const claims = await verifyAccessToken(token);
   if (!claims) return null;
   const email = claims.email.trim().toLowerCase();
-  const staff = await env.DB.prepare('SELECT id,owner_id,organisation_id,email,role,access_subject,active FROM portal_staff WHERE email=? AND active=1').bind(email).first<StaffRow>();
+  const staff = await env.DB.prepare('SELECT id,owner_id,organisation_id,email,role,access_subject,last_login_at,active FROM portal_staff WHERE email=? AND active=1').bind(email).first<StaffRow>();
   if (!staff || (staff.role !== 'OWNER_ADMIN' && staff.role !== 'DRIVER') || (staff.access_subject && staff.access_subject !== claims.sub)) return null;
   if (!staff.access_subject) {
-    const result = await env.DB.prepare('UPDATE portal_staff SET access_subject=?,updated_at=? WHERE id=? AND access_subject IS NULL AND active=1').bind(claims.sub, new Date().toISOString(), staff.id).run();
+    const loginAt = new Date((claims.iat || Math.floor(Date.now() / 1000)) * 1000).toISOString();
+    const result = await env.DB.prepare('UPDATE portal_staff SET access_subject=?,last_login_at=?,updated_at=? WHERE id=? AND access_subject IS NULL AND active=1').bind(claims.sub, loginAt, new Date().toISOString(), staff.id).run();
     if (result.meta.changes !== 1) return null;
+  } else if (claims.iat) {
+    const loginAt = new Date(claims.iat * 1000).toISOString();
+    await env.DB.prepare("UPDATE portal_staff SET last_login_at=? WHERE id=? AND active=1 AND (last_login_at IS NULL OR last_login_at < ?)").bind(loginAt, staff.id, loginAt).run();
   }
   return { userId: staff.id, ownerId: staff.owner_id, organisationId: staff.organisation_id, email, displayName: email, role: staff.role };
 }

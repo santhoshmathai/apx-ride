@@ -6,7 +6,7 @@ export async function GET() {
   if (!cloudflareAuthEnabled()) return NextResponse.json({ error: 'Not available in Sites mode' }, { status: 404 });
   const user = await getPortalPrincipal();
   if (!user || user.role !== 'OWNER_ADMIN') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-  const rows = await env.DB.prepare("SELECT id,email,role,active,created_at,CASE WHEN access_subject IS NULL THEN 0 ELSE 1 END AS identity_verified FROM portal_staff WHERE organisation_id=? AND owner_id=? ORDER BY CASE role WHEN 'OWNER_ADMIN' THEN 0 ELSE 1 END,email").bind(user.organisationId, user.ownerId).all();
+  const rows = await env.DB.prepare("SELECT id,email,role,active,created_at,last_login_at,CASE WHEN access_subject IS NULL THEN 0 ELSE 1 END AS identity_verified FROM portal_staff WHERE organisation_id=? AND owner_id=? ORDER BY CASE role WHEN 'OWNER_ADMIN' THEN 0 ELSE 1 END,email").bind(user.organisationId, user.ownerId).all();
   return NextResponse.json(rows.results);
 }
 

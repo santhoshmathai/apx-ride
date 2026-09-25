@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { RecordsHub } from './records-hub';
 import { BookingRequests } from './booking-requests';
-import { StaffAccess } from './staff-access';
+import { StaffAccess, StaffAccessSummary } from './staff-access';
 
 type Booking = {
   id: number;
@@ -411,6 +411,7 @@ function Dashboard({
           detail={`${operators.length} booking sources`}
         />
       </div>
+      <StaffAccessSummary open={() => go('Staff & Access')} />
       <TodayJobs jobs={upcoming.filter((booking) => booking.pickup_at.slice(0, 10) === new Date().toISOString().slice(0, 10))} go={go} />
     </>
   );

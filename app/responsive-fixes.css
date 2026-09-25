@@ -53,6 +53,12 @@
 .staff-row-actions { display: flex; gap: 7px; }
 .staff-row-actions button { border: 1px solid #555; border-radius: 8px; background: transparent; color: #ddd; padding: 8px 11px; }
 .staff-row-actions button.danger { border-color: #74363b; color: #ef999f; }
+.staff-summary { display: flex; width: 100%; align-items: center; justify-content: space-between; margin-bottom: 14px; color: #eee; text-align: left; }
+.staff-summary > div { display: grid; gap: 5px; }
+.staff-summary small { color: #d8aa2d; font-size: .65rem; font-weight: 800; letter-spacing: .12em; }
+.staff-summary strong { font-size: 1rem; }
+.staff-summary span { color: #96999c; font-size: .74rem; }
+.staff-summary .staff-summary-link { color: #e4bd55; }
 .next-job-preview,
 .today-job-list button {
   display: grid;
@@ -278,6 +284,7 @@
   .staff-row { align-items: stretch; grid-template-columns: 1fr; }
   .staff-badges { justify-content: flex-start; }
   .staff-row-actions { flex-wrap: wrap; }
+  .staff-summary { align-items: flex-start; flex-direction: column; gap: 12px; }
   .dashboard-hero + .stats {
     margin-top: 16px;
   }

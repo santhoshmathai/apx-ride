@@ -150,6 +150,7 @@ export const portalStaff = sqliteTable('portal_staff', {
   email: text('email').notNull(),
   role: text('role').notNull(),
   accessSubject: text('access_subject'),
+  lastLoginAt: text('last_login_at'),
   active: integer('active').notNull().default(1),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),

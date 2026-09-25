@@ -3,7 +3,23 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, CircleAlert, UserRoundPlus } from 'lucide-react';
 
-type StaffMember = { id: string; email: string; role: 'OWNER_ADMIN' | 'DRIVER'; active: number; created_at: string; identity_verified: number };
+type StaffMember = { id: string; email: string; role: 'OWNER_ADMIN' | 'DRIVER'; active: number; created_at: string; last_login_at: string | null; identity_verified: number };
+
+async function loadStaff(): Promise<StaffMember[]> {
+  const response = await fetch('/api/staff', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+  const value = await response.json() as StaffMember[] | { error?: string };
+  if (!response.ok || !Array.isArray(value)) throw new Error(!Array.isArray(value) && value.error ? value.error : 'Could not load staff access');
+  return value;
+}
+
+export function StaffAccessSummary({ open }: { open: () => void }) {
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  useEffect(() => { void loadStaff().then(setStaff).catch(() => setStaff([])); }, []);
+  const owners = staff.filter((member) => member.role === 'OWNER_ADMIN' && member.active).length;
+  const activeDrivers = staff.filter((member) => member.role === 'DRIVER' && member.active).length;
+  const inactiveDrivers = staff.filter((member) => member.role === 'DRIVER' && !member.active).length;
+  return <button className="staff-summary panel" onClick={open}><div><small>STAFF ACCESS</small><strong>{owners} Owner/Admin</strong><span>{activeDrivers} active Driver{activeDrivers === 1 ? '' : 's'} · {inactiveDrivers} inactive</span></div><span className="staff-summary-link">Manage access →</span></button>;
+}
 
 export function StaffAccess() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
@@ -14,10 +30,7 @@ export function StaffAccess() {
   const refresh = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const response = await fetch('/api/staff', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-      const value = await response.json() as StaffMember[] | { error?: string };
-      if (!response.ok || !Array.isArray(value)) throw new Error(!Array.isArray(value) && value.error ? value.error : 'Could not load staff access');
-      setStaff(value);
+      setStaff(await loadStaff());
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not load staff access'); }
     finally { setLoading(false); }
   }, []);
@@ -74,6 +87,6 @@ export function StaffAccess() {
       <article className="panel staff-security-note"><CircleAlert /><div><h3>Two controls are required</h3><p>Cloudflare authenticates the named person. The portal membership decides whether they are an Owner/Admin or Driver. Adding an email in only one place never grants complete access.</p></div></article>
     </div>
     {error && <p className="staff-message error" role="alert">{error}</p>}{notice && <p className="staff-message success"><CheckCircle2 />{notice}</p>}
-    <article className="panel staff-list-card"><div className="head"><small>AUTHORISED STAFF</small><h3>Portal memberships</h3></div>{loading ? <p>Loading staff…</p> : <div className="staff-list">{staff.map((member) => <div className="staff-row" key={member.id}><div><strong>{member.email}</strong><span>{member.role === 'OWNER_ADMIN' ? 'Owner/Admin' : 'Driver'} · Added {new Date(member.created_at).toLocaleDateString('en-GB')}</span></div><div className="staff-badges"><span className={member.active ? 'active' : 'inactive'}>{member.active ? 'Active' : 'Disabled'}</span><span className={member.identity_verified ? 'verified' : 'pending'}>{member.identity_verified ? 'Identity verified' : 'Awaiting first login'}</span></div>{member.role === 'DRIVER' && <div className="staff-row-actions"><button disabled={saving} onClick={() => void setActive(member, !member.active)}>{member.active ? 'Disable' : 'Reactivate'}</button>{!member.active && !member.identity_verified && <button className="danger" disabled={saving} onClick={() => void deleteUnusedDriver(member)}>Delete</button>}</div>}</div>)}</div>}</article>
+    <article className="panel staff-list-card"><div className="head"><small>AUTHORISED STAFF</small><h3>Portal memberships</h3></div>{loading ? <p>Loading staff…</p> : <div className="staff-list">{staff.map((member) => <div className="staff-row" key={member.id}><div><strong>{member.email}</strong><span>{member.role === 'OWNER_ADMIN' ? 'Owner/Admin' : 'Driver'} · Added {new Date(member.created_at).toLocaleDateString('en-GB')}</span><span>Last successful login: {member.last_login_at ? new Date(member.last_login_at).toLocaleString('en-GB') : 'Not recorded yet'}</span></div><div className="staff-badges"><span className={member.active ? 'active' : 'inactive'}>{member.active ? 'Active' : 'Disabled'}</span><span className={member.identity_verified ? 'verified' : 'pending'}>{member.identity_verified ? 'Identity verified' : 'Awaiting first login'}</span></div>{member.role === 'DRIVER' && <div className="staff-row-actions"><button disabled={saving} onClick={() => void setActive(member, !member.active)}>{member.active ? 'Disable' : 'Reactivate'}</button>{!member.active && !member.identity_verified && <button className="danger" disabled={saving} onClick={() => void deleteUnusedDriver(member)}>Delete</button>}</div>}</div>)}</div>}</article>
   </section>;
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `portal_staff` ADD `last_login_at` text;
