@@ -10,7 +10,7 @@ async function admin() { if (!cloudflareAuthEnabled()) return null; const user =
 export async function GET(req: Request) {
   const user = await admin(); if (!user) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   const bookingId = Number(new URL(req.url).searchParams.get('bookingId'));
-  const drivers = await env.DB.prepare(`${driverEligibilitySelect} WHERE s.organisation_id=? AND s.owner_id=? AND p.id IS NOT NULL ORDER BY s.email`).bind(user.organisationId, user.ownerId).all<Record<string, unknown> & DriverEligibilityRow>();
+  const drivers = await env.DB.prepare(`${driverEligibilitySelect} WHERE s.organisation_id=? AND s.owner_id=? AND (s.role='DRIVER' OR p.id IS NOT NULL) ORDER BY s.email`).bind(user.organisationId, user.ownerId).all<Record<string, unknown> & DriverEligibilityRow>();
   const history = Number.isSafeInteger(bookingId) && bookingId > 0 ? await env.DB.prepare(`SELECT a.*,s.email,s.role,p.full_name,v.registration FROM booking_assignments a JOIN portal_staff s ON s.id=a.driver_staff_id LEFT JOIN driver_profiles p ON p.staff_id=s.id LEFT JOIN driver_vehicles v ON v.driver_profile_id=p.id WHERE a.owner_id=? AND a.booking_id=? ORDER BY a.created_at DESC`).bind(user.ownerId, bookingId).all() : { results: [] };
   const events = Number.isSafeInteger(bookingId) && bookingId > 0 ? await env.DB.prepare('SELECT * FROM assignment_events WHERE owner_id=? AND booking_id=? ORDER BY created_at DESC,id DESC').bind(user.ownerId, bookingId).all() : { results: [] };
   const booking = Number.isSafeInteger(bookingId) && bookingId > 0 ? await env.DB.prepare('SELECT id,pickup_at,fare FROM bookings WHERE id=? AND owner_id=?').bind(bookingId, user.ownerId).first<{ id: number; pickup_at: string; fare: number }>() : null;
