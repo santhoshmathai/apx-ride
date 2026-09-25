@@ -1,16 +1,17 @@
 import { AppShell } from './app-shell';
 import { chatGPTSignInPath, chatGPTSignOutPath, getChatGPTUser, isApprovedEmail } from './chatgpt-auth';
-import { cloudflareAuthEnabled, getPortalPrincipal } from './portal-auth';
+import { cloudflareAccessLogoutUrl, cloudflareAuthEnabled, getPortalPrincipal } from './portal-auth';
 import { DriverDashboard } from './driver-dashboard';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Home() {
   if (cloudflareAuthEnabled()) {
+    const signOutPath = cloudflareAccessLogoutUrl();
     const principal = await getPortalPrincipal();
-    if (!principal) return <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-slate-100"><section className="max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-8"><h1 className="text-2xl font-bold">Access not approved</h1><p className="mt-4 text-slate-300">Sign in with your approved Cloudflare Access identity. If this is your first login, ask the APX RIDE owner to provision your exact email address.</p><a className="mt-6 inline-block text-amber-300 underline" href="/cdn-cgi/access/logout">Sign out and try another account</a></section></main>;
-    if (principal.role === 'DRIVER') return <DriverDashboard user={principal} />;
-    return <AppShell signOutPath="/cdn-cgi/access/logout" />;
+    if (!principal) return <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-slate-100"><section className="max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-8"><h1 className="text-2xl font-bold">Access not approved</h1><p className="mt-4 text-slate-300">Sign in with your approved Cloudflare Access identity. If this is your first login, ask the APX RIDE owner to provision your exact email address.</p><a className="mt-6 inline-block text-amber-300 underline" href={signOutPath}>Sign out and try another account</a></section></main>;
+    if (principal.role === 'DRIVER') return <DriverDashboard user={principal} signOutPath={signOutPath} />;
+    return <AppShell signOutPath={signOutPath} />;
   }
   const user = await getChatGPTUser();
   if (!user) {
