@@ -14,11 +14,12 @@
 }
 
 .sidebar-signout svg { width: 16px; }
+.sidebar footer { display: block; }
 .workspace-state { display: flex; align-items: center; gap: 8px; }
 .workspace-state i { flex: 0 0 auto; }
 .signed-in-account { display: grid; gap: 3px; min-width: 0; margin-top: 12px; }
 .signed-in-account small { color: #777b7f; font-size: .62rem; text-transform: uppercase; letter-spacing: .08em; }
-.signed-in-account strong { overflow: hidden; color: #f1f1f1; font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
+.signed-in-account strong { color: #f1f1f1; font-size: .72rem; line-height: 1.4; overflow-wrap: anywhere; }
 .signed-in-account span { color: #9a9da0; font-size: .66rem; }
 .staff-access-page h2 { margin: 5px 0; font-size: 1.7rem; }
 .staff-access-page .register-head p, .staff-security-note p { color: #96999c; }
