@@ -59,6 +59,19 @@
 .staff-summary strong { font-size: 1rem; }
 .staff-summary span { color: #96999c; font-size: .74rem; }
 .staff-summary .staff-summary-link { color: #e4bd55; }
+.driver-profile-modal > header p { margin: 4px 0 0; color: #929598; font-size: .72rem; overflow-wrap: anywhere; }
+.driver-profile-modal h3 { margin: 20px 0 8px; }
+.onboarding-status { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin: 18px 0; }
+.onboarding-status > div { display: flex; align-items: center; gap: 8px; padding: 10px; border: 1px solid #494126; border-radius: 8px; color: #d6b95e; font-size: .72rem; }
+.onboarding-status > div.done { border-color: #315d44; color: #82cb9d; }
+.onboarding-status svg { width: 17px; flex: 0 0 auto; }
+.eligibility-block { padding: 13px 16px; border: 1px solid #704044; border-radius: 9px; background: #271718; color: #eea1a6; font-size: .74rem; }
+.eligibility-block ul { margin: 8px 0 0; padding-left: 18px; line-height: 1.55; }
+.driver-profile-modal .check-label { display: flex; align-items: center; gap: 8px; padding: 10px; border: 1px solid #303337; border-radius: 8px; }
+.driver-profile-modal .check-label input { width: auto; margin: 0; }
+.private-document-note { padding: 12px; border-left: 3px solid #b8912f; background: #1b180f; color: #aaa; font-size: .72rem; line-height: 1.5; }
+.approval-control { display: grid; gap: 6px; margin: 14px 0 20px; }
+.approval-control small { color: #929598; }
 .next-job-preview,
 .today-job-list button {
   display: grid;
@@ -285,6 +298,7 @@
   .staff-badges { justify-content: flex-start; }
   .staff-row-actions { flex-wrap: wrap; }
   .staff-summary { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .onboarding-status { grid-template-columns: 1fr; }
   .dashboard-hero + .stats {
     margin-top: 16px;
   }

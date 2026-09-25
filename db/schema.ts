@@ -156,6 +156,43 @@ export const portalStaff = sqliteTable('portal_staff', {
   updatedAt: text('updated_at').notNull(),
 }, (table) => [uniqueIndex('idx_portal_staff_email').on(table.email), uniqueIndex('idx_portal_staff_access_subject').on(table.accessSubject)]);
 
+export const driverProfiles = sqliteTable('driver_profiles', {
+  id: text('id').primaryKey(),
+  organisationId: text('organisation_id').notNull(),
+  ownerId: text('owner_id').notNull(),
+  staffId: text('staff_id').notNull(),
+  fullName: text('full_name').notNull().default(''),
+  phone: text('phone').notNull().default(''),
+  licensingAuthority: text('licensing_authority').notNull().default(''),
+  privateHireLicenceNumber: text('private_hire_licence_number').notNull().default(''),
+  privateHireLicenceExpiry: text('private_hire_licence_expiry').notNull().default(''),
+  dvlaLicenceNumber: text('dvla_licence_number').notNull().default(''),
+  dvlaLicenceExpiry: text('dvla_licence_expiry').notNull().default(''),
+  addressEvidenceStatus: text('address_evidence_status').notNull().default('MISSING'),
+  active: integer('active').notNull().default(1),
+  approvedForAssignment: integer('approved_for_assignment').notNull().default(0),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => [uniqueIndex('idx_driver_profiles_staff').on(table.staffId)]);
+
+export const driverVehicles = sqliteTable('driver_vehicles', {
+  id: text('id').primaryKey(),
+  organisationId: text('organisation_id').notNull(),
+  ownerId: text('owner_id').notNull(),
+  driverProfileId: text('driver_profile_id').notNull(),
+  registration: text('registration').notNull().default(''),
+  makeModelColour: text('make_model_colour').notNull().default(''),
+  privateHireVehicleLicenceNumber: text('private_hire_vehicle_licence_number').notNull().default(''),
+  privateHireVehicleLicenceExpiry: text('private_hire_vehicle_licence_expiry').notNull().default(''),
+  motExpiry: text('mot_expiry').notNull().default(''),
+  insuranceExpiry: text('insurance_expiry').notNull().default(''),
+  v5DocumentStatus: text('v5_document_status').notNull().default('MISSING'),
+  approved: integer('approved').notNull().default(0),
+  active: integer('active').notNull().default(1),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => [uniqueIndex('idx_driver_vehicles_profile').on(table.driverProfileId)]);
+
 export const publicBookingSettings = sqliteTable('public_booking_settings', {
   organisationId: text('organisation_id').primaryKey(),
   publicKey: text('public_key').notNull(),
