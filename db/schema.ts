@@ -138,6 +138,31 @@ export const auditEvents = sqliteTable('audit_events', {
   createdAt: text('created_at').notNull(),
 });
 
+export const councilStaff = sqliteTable('council_staff', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  ownerId: text('owner_id').notNull(),
+  organisationId: text('organisation_id').notNull(),
+  fullName: text('full_name').notNull(),
+  email: text('email').notNull().default(''),
+  phone: text('phone').notNull().default(''),
+  roleTitle: text('role_title').notNull().default('Booking/dispatch staff'),
+  takesBookings: integer('takes_bookings').notNull().default(0),
+  dispatchesVehicles: integer('dispatches_vehicles').notNull().default(0),
+  startDate: text('start_date').notNull(),
+  endDate: text('end_date').notNull().default(''),
+  dbsSighted: integer('dbs_sighted').notNull().default(0),
+  dbsSightedDate: text('dbs_sighted_date').notNull().default(''),
+  dbsCertificateDate: text('dbs_certificate_date').notNull().default(''),
+  dbsSightedBy: text('dbs_sighted_by').notNull().default(''),
+  suitabilityDecision: text('suitability_decision').notNull().default('PENDING'),
+  suitabilityDecisionDate: text('suitability_decision_date').notNull().default(''),
+  convictionDeclarationDate: text('conviction_declaration_date').notNull().default(''),
+  trainingNotes: text('training_notes').notNull().default(''),
+  status: text('status').notNull().default('ACTIVE'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => [index('idx_council_staff_org').on(table.organisationId, table.status)]);
+
 export const recordRevisions = sqliteTable('record_revisions', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   ownerId: text('owner_id').notNull(),
