@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Download, FileDown, Plus, Save, X } from 'lucide-react';
+import { DriverProfileEditor, type StaffMember } from './staff-access';
 
 type RecordRow = {
   id: number;
@@ -88,18 +89,31 @@ const schemas: Record<string, { label: string; singular: string; fields: Field[]
 };
 
 export function RecordsHub() {
-  const [tab, setTab] = useState('roster');
+  const [tab, setTab] = useState('drivers');
   return (
     <>
       <section className="page-head">
         <div><h2>Records Hub</h2><p>Operational registers, financial records and council-ready audit exports.</p></div>
       </section>
       <div className="view-tabs records-tabs">
-        {Object.entries(schemas).map(([key, schema]) => <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{schema.label}</button>)}
+        <button className={tab === 'drivers' ? 'active' : ''} onClick={() => setTab('drivers')}>Drivers</button>
+        <button className={tab === 'vehicles' ? 'active' : ''} onClick={() => setTab('vehicles')}>Vehicles</button>
+        {Object.entries(schemas).filter(([key]) => key !== 'roster').map(([key, schema]) => <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{schema.label}</button>)}
       </div>
-      <Register type={tab} />
+      {tab === 'drivers' || tab === 'vehicles' ? <CanonicalDriverRegister view={tab} /> : <Register type={tab} />}
     </>
   );
+}
+
+function CanonicalDriverRegister({ view }: { view: 'drivers' | 'vehicles' }) {
+  const [staff, setStaff] = useState<StaffMember[]>([]); const [editing, setEditing] = useState<StaffMember | null>(null); const [loading, setLoading] = useState(true);
+  const refresh = useCallback(() => fetch('/api/staff').then((response) => response.json()).then((value) => setStaff(Array.isArray(value) ? value.filter((member: StaffMember) => member.has_driver_profile) : [])).finally(() => setLoading(false)), []);
+  useEffect(() => { void refresh(); }, [refresh]);
+  return <section className="panel compliance-register"><header className="register-head"><div><small>CANONICAL COMPLIANCE RECORDS</small><h3>{view === 'drivers' ? 'Driver register' : 'Vehicle register'}</h3><p>These records are the same verified profiles used by assignment eligibility. Access roles remain in Staff &amp; Access.</p></div></header>
+    {loading ? <p>Loading records…</p> : <div className="staff-list">{staff.map((member) => <div className="staff-row" key={member.id}><div><strong>{member.email}</strong><span>{member.role === 'OWNER_ADMIN' ? 'Owner/Admin with Driver profile' : 'Driver'} · Portal {member.active ? 'active' : 'disabled'}</span><span>{view === 'drivers' ? 'Driver identity, licence and address evidence' : 'Approved vehicle, PHV licence, MOT, insurance and V5'}</span></div><div className="staff-badges"><span className={member.approved_for_assignment ? 'verified' : 'pending'}>{member.approved_for_assignment ? 'Assignment eligible' : 'Compliance pending'}</span></div><button onClick={() => setEditing(member)}>View / update {view === 'drivers' ? 'Driver' : 'vehicle'}</button></div>)}</div>}
+    {!loading && !staff.length && <p className="empty-register">No canonical Driver profiles exist yet. Create portal access in Staff &amp; Access, then open the Driver record from there.</p>}
+    {editing && <DriverProfileEditor member={editing} close={() => setEditing(null)} saved={async () => { setEditing(null); await refresh(); }} />}
+  </section>;
 }
 
 function Register({ type }: { type: string }) {

@@ -133,6 +133,7 @@ export function AppShell({ signOutPath, account }: { signOutPath: string; accoun
     [timeFormat, setTimeFormat] = useState<'12' | '24'>('24'),
     [messageTemplates, setMessageTemplates] = useState<MessageTemplates>(defaultMessageTemplates);
   useEffect(() => { activeTimeFormat = timeFormat; }, [timeFormat]);
+  useEffect(() => { const navigate = (event: Event) => setActive((event as CustomEvent<string>).detail); window.addEventListener('apx:navigate', navigate); return () => window.removeEventListener('apx:navigate', navigate); }, []);
   const refresh = () =>
     fetch('/api/bookings')
       .then((r) => r.json())
