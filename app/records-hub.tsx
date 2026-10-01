@@ -128,11 +128,11 @@ export function RecordsHub({ area }: { area: 'people' | 'compliance' }) {
   return (
     <>
       <section className="page-head">
-        <div><h2>{people ? 'People & Fleet' : 'Compliance & Audit'}</h2><p>{people ? 'Manage portal users, booking staff, Drivers, vehicles and their operational assignments.' : 'Maintain council-required incident registers, regulatory procedures, audit history and inspection exports.'}</p></div>
+        <div><h2>{people ? 'Operations' : 'Compliance'}</h2><p>{people ? 'Manage portal users, booking staff, Drivers, vehicles and their operational assignments.' : 'Maintain council-required incident registers, regulatory procedures, audit history and inspection exports.'}</p></div>
       </section>
       <div className="records-category-nav">
         {people ? <>
-          <section><b>Overview</b><div className="view-tabs"><button className={tab==='overview'?'active':''} onClick={()=>setTab('overview')}>People &amp; Fleet Overview</button></div></section>
+          <section><b>Overview</b><div className="view-tabs"><button className={tab==='overview'?'active':''} onClick={()=>setTab('overview')}>Operations Overview</button></div></section>
           <section><b>People</b><div className="view-tabs"><button className={tab==='access'?'active':''} onClick={()=>setTab('access')}>Portal Users</button><button className={tab==='booking_staff'?'active':''} onClick={()=>setTab('booking_staff')}>Booking &amp; Dispatch Staff</button><button className={tab==='drivers'?'active':''} onClick={()=>setTab('drivers')}>Drivers</button><button className={tab==='dismissed_driver'?'active':''} onClick={()=>setTab('dismissed_driver')}>Departures</button></div></section>
           <section><b>Fleet</b><div className="view-tabs"><button className={tab==='vehicles'?'active':''} onClick={()=>setTab('vehicles')}>Vehicles</button><button className={tab==='vehicle_assignments'?'active':''} onClick={()=>setTab('vehicle_assignments')}>Driver–Vehicle Assignments</button><button className={tab==='vehicle_expiry'?'active':''} onClick={()=>setTab('vehicle_expiry')}>Expiring Documents</button></div></section>
         </> : <>
