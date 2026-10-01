@@ -86,6 +86,39 @@ const schemas: Record<string, { label: string; singular: string; fields: Field[]
       { name: 'councilReference', label: 'Council reference' },
     ],
   },
+  dismissed_driver: {
+    label: 'Driver Departures', singular: 'Driver departure', statuses: ['OPEN', 'COUNCIL NOTIFIED', 'CLOSED'],
+    fields: [
+      { name: 'driverName', label: 'Driver full name', required: true },
+      { name: 'driverLicence', label: 'Driver licence number', required: true },
+      { name: 'endDate', label: 'Last working date', type: 'date', required: true },
+      { name: 'reason', label: 'Reason for dismissal / departure', type: 'textarea', required: true },
+      { name: 'councilNotifiedDate', label: 'Council notified date', type: 'date' },
+      { name: 'councilReference', label: 'Council acknowledgement / reference' },
+      { name: 'accessRevoked', label: 'Portal and Cloudflare access revocation evidence' },
+    ],
+  },
+  assistance_dog: {
+    label: 'Assistance Dogs', singular: 'Assistance dog record', statuses: ['RECORDED', 'INVESTIGATING', 'RESOLVED'],
+    fields: [
+      { name: 'bookingRef', label: 'Booking reference', required: true },
+      { name: 'passenger', label: 'Passenger name', required: true },
+      { name: 'driver', label: 'Driver name', required: true },
+      { name: 'request', label: 'Request / incident details', type: 'textarea', required: true },
+      { name: 'exemptionChecked', label: 'Driver exemption evidence checked' },
+      { name: 'actionTaken', label: 'Action taken', type: 'textarea', required: true },
+    ],
+  },
+  licence_change: {
+    label: 'Licence Changes', singular: 'Licence change notification', statuses: ['TO REPORT', 'REPORTED', 'ACKNOWLEDGED'],
+    fields: [
+      { name: 'changeType', label: 'Change type', required: true, options: ['Operating address', 'Directors / ownership', 'Contact details', 'Conviction / caution / arrest', 'Vehicle accident', 'Other material change'] },
+      { name: 'effectiveDate', label: 'Effective / incident date', type: 'date', required: true },
+      { name: 'details', label: 'Change details', type: 'textarea', required: true },
+      { name: 'councilNotifiedDate', label: 'Council notified date', type: 'date' },
+      { name: 'councilReference', label: 'Council acknowledgement / reference' },
+    ],
+  },
 };
 
 export function RecordsHub() {
@@ -99,10 +132,25 @@ export function RecordsHub() {
         <button className={tab === 'drivers' ? 'active' : ''} onClick={() => setTab('drivers')}>Drivers</button>
         <button className={tab === 'vehicles' ? 'active' : ''} onClick={() => setTab('vehicles')}>Vehicles</button>
         {Object.entries(schemas).filter(([key]) => key !== 'roster').map(([key, schema]) => <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{schema.label}</button>)}
+        <button className={tab === 'procedures' ? 'active' : ''} onClick={() => setTab('procedures')}>Procedures</button>
       </div>
-      {tab === 'drivers' || tab === 'vehicles' ? <CanonicalDriverRegister view={tab} /> : <Register type={tab} />}
+      {tab === 'drivers' || tab === 'vehicles' ? <CanonicalDriverRegister view={tab} /> : tab === 'procedures' ? <CouncilProcedures /> : <Register type={tab} />}
     </>
   );
+}
+
+function CouncilProcedures() {
+  const procedures = [
+    ['Booking and dispatch records','Record every booking before the journey; retain who took it, journey details, fare, licensed Driver/vehicle and dispatcher for at least 12 months. Use Booking Control → Council register CSV.'],
+    ['Complaints','Record the complaint promptly, preserve the booking reference and evidence, investigate, record the outcome and provide it to the Council when requested.'],
+    ['Lost property','Record where and when property was found, attempt return to the passenger, preserve evidence of the attempt and document final handover or disposal.'],
+    ['Assistance dogs','Do not refuse an assistance dog unless the Driver holds the relevant exemption. Record any request, refusal or incident and the action taken.'],
+    ['Safeguarding and incidents','Escalate immediate danger to emergency services. Preserve facts and evidence, restrict access, notify the licensing authority where required and record its reference.'],
+    ['Driver departure / dismissal','Disable portal access, remove Cloudflare Access permission, preserve historical booking attribution and notify the Council with the reason where required.'],
+    ['Material licence changes','Record changes to operating address, ownership, contact details, convictions, cautions, arrests or other material facts and evidence the Council notification.'],
+    ['Data protection and retention','Use the private document store only. Never create public R2 links. Retain statutory records for the required period, restrict access and document exports.'],
+  ];
+  return <section className="panel compliance-register"><header className="register-head"><div><small>COUNCIL DEMONSTRATION</small><h3>Operating procedure library</h3><p>Concise operating controls for demonstration. These do not replace the licence conditions or your full written policies.</p></div></header><div className="compliance-list">{procedures.map(([title,body])=><article className="compliance-row" key={title}><div className="record-summary-main"><b>{title}</b><span>{body}</span></div></article>)}</div></section>;
 }
 
 function CanonicalDriverRegister({ view }: { view: 'drivers' | 'vehicles' }) {
@@ -195,6 +243,9 @@ function primaryValue(type: string, data: Record<string, string>, fallback: stri
   if (type === 'roster') return `${data.callSign || ''} ${data.fullName || fallback} · ${data.vrm || 'No vehicle'}`.trim();
   if (type === 'lost_property') return data.item || fallback;
   if (type === 'complaint') return data.complainant || fallback;
+  if (type === 'dismissed_driver') return data.driverName || fallback;
+  if (type === 'assistance_dog') return `${data.bookingRef || fallback} · ${data.passenger || ''}`;
+  if (type === 'licence_change') return data.changeType || fallback;
   return data.driverVehicle || fallback;
 }
 
