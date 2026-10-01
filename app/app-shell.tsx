@@ -112,7 +112,8 @@ const nav = [
   ['Calculator', FileText],
   ['Calendar', CalendarDays],
   ['Messages', MessageSquareText],
-  ['Records & Compliance', FolderLock],
+  ['People & Fleet', FolderLock],
+  ['Compliance & Audit', FileText],
   ['Earnings', PoundSterling],
   ['Settings', Settings],
 ] as const;
@@ -277,7 +278,8 @@ export function AppShell({ signOutPath, account }: { signOutPath: string; accoun
           )}
           {active === 'Calendar' && <Calendar items={bookings} />}
           {active === 'Messages' && <Messages items={bookings} templates={messageTemplates} saveTemplates={saveMessageTemplates} />}
-          {active === 'Records & Compliance' && <RecordsHub />}
+          {active === 'People & Fleet' && <RecordsHub area="people" />}
+          {active === 'Compliance & Audit' && <RecordsHub area="compliance" />}
           {active === 'Earnings' && <EarningsV2 items={bookings} status={status} />}
           {active === 'Settings' && (
             <SettingsPage
@@ -419,7 +421,7 @@ function Dashboard({
           detail={`${operators.length} booking sources`}
         />
       </div>
-      <StaffAccessSummary open={() => go('Records & Compliance')} />
+      <StaffAccessSummary open={() => go('People & Fleet')} />
       <TodayJobs jobs={upcoming.filter((booking) => booking.pickup_at.slice(0, 10) === new Date().toISOString().slice(0, 10))} go={go} />
     </>
   );

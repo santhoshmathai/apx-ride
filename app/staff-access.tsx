@@ -352,12 +352,12 @@ export function StaffAccess({
                       onClick={() =>
                         window.dispatchEvent(
                           new CustomEvent('apx:navigate', {
-                            detail: 'Records & Compliance',
+                            detail: 'People & Fleet',
                           }),
                         )
                       }
                     >
-                      Open Records &amp; Compliance
+                      Open People &amp; Fleet
                     </button>
                   )}
                   {member.role === 'DRIVER' && (
