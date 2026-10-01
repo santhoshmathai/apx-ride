@@ -41,6 +41,11 @@ type Booking = {
   pickup: string;
   dropoff: string;
   pickup_at: string;
+  booking_received_at?: string;
+  responded_by?: string;
+  responded_at?: string;
+  dispatched_by?: string;
+  dispatched_at?: string;
   operator: string;
   booking_type?: 'CASH' | 'ACCOUNT';
   payment_method?: 'CASH' | 'CARD' | '';
@@ -60,6 +65,9 @@ type Booking = {
   driver_call_sign?: string;
   driver_name?: string;
   driver_licence?: string;
+  vehicle_registration?: string;
+  vehicle_licence?: string;
+  retention_until?: string;
 };
 type Rate = { base: number; rate: number };
 type Rates = Record<'Saloon' | 'Estate' | '6-seater' | '7-seater', Rate>;
@@ -707,10 +715,7 @@ function Bookings({
       title="Booking control"
       sub="Move each dispatch from scheduled to en route, then confirm payment at completion."
       action={
-        <button className="primary" onClick={add}>
-          <Plus />
-          Add job
-        </button>
+        <div className="page-actions"><a className="button" href="/api/council-bookings"><Download />Council register CSV</a><button className="primary" onClick={add}><Plus />Add job</button></div>
       }
     >
       <div className="view-tabs">
@@ -1601,6 +1606,8 @@ function BookingDetail({
             <dt>Operator</dt>
             <dd>{b.operator}</dd>
           </div>
+          <div><dt>Booking received</dt><dd>{b.booking_received_at ? new Date(b.booking_received_at).toLocaleString('en-GB') : '—'}</dd></div>
+          <div><dt>Booking taken / responded by</dt><dd>{b.responded_by || '—'}{b.responded_at ? ` · ${new Date(b.responded_at).toLocaleString('en-GB')}` : ''}</dd></div>
           <div>
             <dt>Booking type</dt>
             <dd>{b.booking_type || 'CASH'}</dd>
@@ -1623,12 +1630,17 @@ function BookingDetail({
             <dt>Fare</dt>
             <dd>£{b.fare.toFixed(2)}</dd>
           </div>
+          <div><dt>Assigned Driver / licence</dt><dd>{b.driver_name || 'Unassigned'}{b.driver_licence ? ` · ${b.driver_licence}` : ''}</dd></div>
+          <div><dt>Vehicle / PH licence</dt><dd>{b.vehicle_registration || 'Unassigned'}{b.vehicle_licence ? ` · ${b.vehicle_licence}` : ''}</dd></div>
+          <div><dt>Dispatched by</dt><dd>{b.dispatched_by || 'Not dispatched'}{b.dispatched_at ? ` · ${new Date(b.dispatched_at).toLocaleString('en-GB')}` : ''}</dd></div>
+          <div><dt>Statutory retention</dt><dd>{b.retention_until ? `Keep until ${new Date(b.retention_until).toLocaleDateString('en-GB')}` : '—'}</dd></div>
           <div>
             <dt>Notes</dt>
             <dd>{b.notes || '—'}</dd>
           </div>
         </dl>
         <footer>
+          <a className="button" href={`/api/council-bookings?id=${b.id}`}><Download />Council CSV</a>
           <button onClick={close}>Close</button>
           <button className="primary" onClick={edit}>
             <Pencil />
