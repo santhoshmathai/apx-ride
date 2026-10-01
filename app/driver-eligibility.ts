@@ -5,6 +5,8 @@ export type DriverEligibilityRow = {
   profile_active: number | null;
   approved_for_assignment: number | null;
   full_name: string | null;
+  first_name: string | null;
+  surname: string | null;
   phone: string | null;
   licensing_authority: string | null;
   private_hire_licence_number: string | null;
@@ -53,9 +55,9 @@ export function eligibilityReasons(row: DriverEligibilityRow, today = new Date()
 export const driverEligibilitySelect = `
   SELECT s.id,s.email,s.role,s.active AS staff_active,
     CASE WHEN s.access_subject IS NULL THEN 0 ELSE 1 END AS identity_verified,
-    p.id AS profile_id,p.active AS profile_active,p.approved_for_assignment,p.full_name,p.phone,p.licensing_authority,
+    p.id AS profile_id,p.active AS profile_active,p.approved_for_assignment,p.full_name,p.first_name,p.surname,p.address,p.phd_badge_number,p.dbs_status,p.right_to_work_status,p.visa_status,p.emergency_contact,p.phone,p.licensing_authority,
     p.private_hire_licence_number,p.private_hire_licence_expiry,p.dvla_licence_number,p.dvla_licence_expiry,p.address_evidence_status,
-    v.id AS vehicle_id,v.active AS vehicle_active,v.approved AS vehicle_approved,v.registration,v.make_model_colour,
+    v.id AS vehicle_id,v.active AS vehicle_active,v.approved AS vehicle_approved,v.registration,v.make_model_colour,v.vehicle_make,v.vehicle_model,v.vehicle_colour,v.vehicle_category,v.phv_badge_number,v.registered_keeper_address,v.insurance_valid_from,v.in_term_mot_date,
     v.private_hire_vehicle_licence_number,v.private_hire_vehicle_licence_expiry,v.mot_expiry,v.insurance_expiry,v.v5_document_status
   FROM portal_staff s
   LEFT JOIN driver_profiles p ON p.staff_id=s.id AND p.organisation_id=s.organisation_id

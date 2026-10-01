@@ -128,11 +128,10 @@ export function RecordsHub() {
       <section className="page-head">
         <div><h2>Records Hub</h2><p>Operational registers, financial records and council-ready audit exports.</p></div>
       </section>
-      <div className="view-tabs records-tabs">
-        <button className={tab === 'drivers' ? 'active' : ''} onClick={() => setTab('drivers')}>Drivers</button>
-        <button className={tab === 'vehicles' ? 'active' : ''} onClick={() => setTab('vehicles')}>Vehicles</button>
-        {Object.entries(schemas).filter(([key]) => key !== 'roster').map(([key, schema]) => <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{schema.label}</button>)}
-        <button className={tab === 'procedures' ? 'active' : ''} onClick={() => setTab('procedures')}>Procedures</button>
+      <div className="records-category-nav">
+        <section><b>1. ROSTER &amp; FLEET</b><div className="view-tabs"><button className={tab==='drivers'?'active':''} onClick={()=>setTab('drivers')}>Drivers</button><button className={tab==='vehicles'?'active':''} onClick={()=>setTab('vehicles')}>Vehicles</button><button className={tab==='dismissed_driver'?'active':''} onClick={()=>setTab('dismissed_driver')}>Driver Departures</button><button className={tab==='licence_change'?'active':''} onClick={()=>setTab('licence_change')}>Licence Changes</button></div></section>
+        <section><b>2. INCIDENTS &amp; LOGS</b><div className="view-tabs"><button className={tab==='lost_property'?'active':''} onClick={()=>setTab('lost_property')}>Lost Property</button><button className={tab==='complaint'?'active':''} onClick={()=>setTab('complaint')}>Complaints</button><button className={tab==='assistance_dog'?'active':''} onClick={()=>setTab('assistance_dog')}>Assistance Dogs</button></div></section>
+        <section><b>3. AUDIT &amp; PROCEDURES</b><div className="view-tabs"><button className={tab==='council_incident'?'active':''} onClick={()=>setTab('council_incident')}>Incident Report</button><button className={tab==='procedures'?'active':''} onClick={()=>setTab('procedures')}>Standard Procedures</button></div></section>
       </div>
       {tab === 'drivers' || tab === 'vehicles' ? <CanonicalDriverRegister view={tab} /> : tab === 'procedures' ? <CouncilProcedures /> : <Register type={tab} />}
     </>

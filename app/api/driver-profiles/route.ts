@@ -6,9 +6,11 @@ import { validMutationOrigin } from '../../request-security';
 
 type ProfileBody = {
   staffId?: unknown; fullName?: unknown; phone?: unknown; licensingAuthority?: unknown;
+  firstName?: unknown; surname?: unknown; address?: unknown; phdBadgeNumber?: unknown; dbsStatus?: unknown; rightToWorkStatus?: unknown; visaStatus?: unknown; emergencyContact?: unknown;
   privateHireLicenceNumber?: unknown; privateHireLicenceExpiry?: unknown; dvlaLicenceNumber?: unknown;
   dvlaLicenceExpiry?: unknown; addressEvidenceStatus?: unknown; profileActive?: unknown;
   registration?: unknown; makeModelColour?: unknown; privateHireVehicleLicenceNumber?: unknown;
+  vehicleMake?: unknown; vehicleModel?: unknown; vehicleColour?: unknown; vehicleCategory?: unknown; phvBadgeNumber?: unknown; registeredKeeperAddress?: unknown; insuranceValidFrom?: unknown; inTermMotDate?: unknown;
   privateHireVehicleLicenceExpiry?: unknown; motExpiry?: unknown; insuranceExpiry?: unknown;
   v5DocumentStatus?: unknown; vehicleActive?: unknown; vehicleApproved?: unknown; approvedForAssignment?: unknown;
 };
@@ -44,30 +46,31 @@ export async function PUT(req: Request) {
   const existing = await env.DB.prepare('SELECT id FROM driver_profiles WHERE staff_id=? AND organisation_id=?').bind(staffId, user.organisationId).first<{ id: string }>();
   const profileId = existing?.id || crypto.randomUUID();
   const values = {
-    fullName: text(body.fullName), phone: text(body.phone, 40), licensingAuthority: text(body.licensingAuthority),
+    firstName: text(body.firstName), surname: text(body.surname), fullName: `${text(body.firstName)} ${text(body.surname)}`.trim() || text(body.fullName), address: text(body.address,500), phdBadgeNumber:text(body.phdBadgeNumber), dbsStatus:status(body.dbsStatus), rightToWorkStatus:status(body.rightToWorkStatus), visaStatus:text(body.visaStatus,30)||'NOT_REQUIRED', emergencyContact:text(body.emergencyContact,300), phone: text(body.phone, 40), licensingAuthority: text(body.licensingAuthority),
     privateHireLicenceNumber: text(body.privateHireLicenceNumber), privateHireLicenceExpiry: text(body.privateHireLicenceExpiry, 10),
     dvlaLicenceNumber: text(body.dvlaLicenceNumber), dvlaLicenceExpiry: text(body.dvlaLicenceExpiry, 10), addressEvidenceStatus: status(body.addressEvidenceStatus),
     profileActive: body.profileActive === false ? 0 : 1, approved: body.approvedForAssignment === true ? 1 : 0,
   };
   if (existing) {
-    await env.DB.prepare('UPDATE driver_profiles SET full_name=?,phone=?,licensing_authority=?,private_hire_licence_number=?,private_hire_licence_expiry=?,dvla_licence_number=?,dvla_licence_expiry=?,address_evidence_status=?,active=?,approved_for_assignment=?,updated_at=? WHERE id=? AND organisation_id=?')
-      .bind(values.fullName, values.phone, values.licensingAuthority, values.privateHireLicenceNumber, values.privateHireLicenceExpiry, values.dvlaLicenceNumber, values.dvlaLicenceExpiry, values.addressEvidenceStatus, values.profileActive, values.approved, now, profileId, user.organisationId).run();
+    await env.DB.prepare('UPDATE driver_profiles SET full_name=?,first_name=?,surname=?,address=?,phd_badge_number=?,dbs_status=?,right_to_work_status=?,visa_status=?,emergency_contact=?,phone=?,licensing_authority=?,private_hire_licence_number=?,private_hire_licence_expiry=?,dvla_licence_number=?,dvla_licence_expiry=?,address_evidence_status=?,active=?,approved_for_assignment=?,updated_at=? WHERE id=? AND organisation_id=?')
+      .bind(values.fullName,values.firstName,values.surname,values.address,values.phdBadgeNumber,values.dbsStatus,values.rightToWorkStatus,values.visaStatus,values.emergencyContact,values.phone, values.licensingAuthority, values.privateHireLicenceNumber, values.privateHireLicenceExpiry, values.dvlaLicenceNumber, values.dvlaLicenceExpiry, values.addressEvidenceStatus, values.profileActive, values.approved, now, profileId, user.organisationId).run();
   } else {
-    await env.DB.prepare('INSERT INTO driver_profiles(id,organisation_id,owner_id,staff_id,full_name,phone,licensing_authority,private_hire_licence_number,private_hire_licence_expiry,dvla_licence_number,dvla_licence_expiry,address_evidence_status,active,approved_for_assignment,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-      .bind(profileId, user.organisationId, user.ownerId, staffId, values.fullName, values.phone, values.licensingAuthority, values.privateHireLicenceNumber, values.privateHireLicenceExpiry, values.dvlaLicenceNumber, values.dvlaLicenceExpiry, values.addressEvidenceStatus, values.profileActive, values.approved, now, now).run();
+    await env.DB.prepare('INSERT INTO driver_profiles(id,organisation_id,owner_id,staff_id,full_name,first_name,surname,address,phd_badge_number,dbs_status,right_to_work_status,visa_status,emergency_contact,phone,licensing_authority,private_hire_licence_number,private_hire_licence_expiry,dvla_licence_number,dvla_licence_expiry,address_evidence_status,active,approved_for_assignment,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(profileId,user.organisationId,user.ownerId,staffId,values.fullName,values.firstName,values.surname,values.address,values.phdBadgeNumber,values.dbsStatus,values.rightToWorkStatus,values.visaStatus,values.emergencyContact,values.phone,values.licensingAuthority,values.privateHireLicenceNumber,values.privateHireLicenceExpiry,values.dvlaLicenceNumber,values.dvlaLicenceExpiry,values.addressEvidenceStatus,values.profileActive,values.approved,now,now).run();
   }
   const vehicle = await env.DB.prepare('SELECT id FROM driver_vehicles WHERE driver_profile_id=? AND organisation_id=?').bind(profileId, user.organisationId).first<{ id: string }>();
   const vehicleId = vehicle?.id || crypto.randomUUID();
-  const vehicleValues = [text(body.registration, 20).toUpperCase(), text(body.makeModelColour), text(body.privateHireVehicleLicenceNumber), text(body.privateHireVehicleLicenceExpiry, 10), text(body.motExpiry, 10), text(body.insuranceExpiry, 10), status(body.v5DocumentStatus), body.vehicleApproved === true ? 1 : 0, body.vehicleActive === false ? 0 : 1];
-  if (vehicle) await env.DB.prepare('UPDATE driver_vehicles SET registration=?,make_model_colour=?,private_hire_vehicle_licence_number=?,private_hire_vehicle_licence_expiry=?,mot_expiry=?,insurance_expiry=?,v5_document_status=?,approved=?,active=?,updated_at=? WHERE id=? AND organisation_id=?').bind(...vehicleValues, now, vehicleId, user.organisationId).run();
-  else await env.DB.prepare('INSERT INTO driver_vehicles(id,organisation_id,owner_id,driver_profile_id,registration,make_model_colour,private_hire_vehicle_licence_number,private_hire_vehicle_licence_expiry,mot_expiry,insurance_expiry,v5_document_status,approved,active,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(vehicleId, user.organisationId, user.ownerId, profileId, ...vehicleValues, now, now).run();
+  const vehicleValues = [text(body.registration,20).toUpperCase(),text(body.vehicleMake),text(body.vehicleModel),text(body.vehicleColour),text(body.vehicleCategory),text(body.phvBadgeNumber),text(body.registeredKeeperAddress,500),text(body.insuranceValidFrom,10),text(body.inTermMotDate,10),text(body.privateHireVehicleLicenceNumber),text(body.privateHireVehicleLicenceExpiry,10),text(body.motExpiry,10),text(body.insuranceExpiry,10),status(body.v5DocumentStatus),body.vehicleApproved===true?1:0,body.vehicleActive===false?0:1];
+  if (vehicle) await env.DB.prepare('UPDATE driver_vehicles SET registration=?,vehicle_make=?,vehicle_model=?,vehicle_colour=?,vehicle_category=?,phv_badge_number=?,registered_keeper_address=?,insurance_valid_from=?,in_term_mot_date=?,private_hire_vehicle_licence_number=?,private_hire_vehicle_licence_expiry=?,mot_expiry=?,insurance_expiry=?,v5_document_status=?,approved=?,active=?,make_model_colour=trim(?||\' \'||?||\' \'||?),updated_at=? WHERE id=? AND organisation_id=?').bind(...vehicleValues,text(body.vehicleMake),text(body.vehicleModel),text(body.vehicleColour),now,vehicleId,user.organisationId).run();
+  else await env.DB.prepare('INSERT INTO driver_vehicles(id,organisation_id,owner_id,driver_profile_id,registration,vehicle_make,vehicle_model,vehicle_colour,vehicle_category,phv_badge_number,registered_keeper_address,insurance_valid_from,in_term_mot_date,private_hire_vehicle_licence_number,private_hire_vehicle_licence_expiry,mot_expiry,insurance_expiry,v5_document_status,approved,active,make_model_colour,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(vehicleId,user.organisationId,user.ownerId,profileId,...vehicleValues,`${text(body.vehicleMake)} ${text(body.vehicleModel)} ${text(body.vehicleColour)}`.trim(),now,now).run();
 
   const updated = await env.DB.prepare(`${driverEligibilitySelect} WHERE s.id=? AND s.organisation_id=? AND s.owner_id=?`).bind(staffId, user.organisationId, user.ownerId).first<Record<string, unknown> & DriverEligibilityRow>();
   if (!updated) return NextResponse.json({ error: 'Could not reload Driver profile' }, { status: 500 });
   const reasons = eligibilityReasons(updated);
   if (values.approved && reasons.filter((reason) => reason !== 'Driver is not approved for assignment').length) {
     await env.DB.prepare('UPDATE driver_profiles SET approved_for_assignment=0,updated_at=? WHERE id=?').bind(now, profileId).run();
-    return NextResponse.json({ error: `Cannot approve for assignment: ${reasons.filter((reason) => reason !== 'Driver is not approved for assignment').join('; ')}` }, { status: 409 });
+    await env.DB.prepare('INSERT INTO audit_events(owner_id,actor_email,action,entity_type,entity_id,summary,created_at) VALUES(?,?,?,?,?,?,?)').bind(user.ownerId,user.email,'UPDATE_DRIVER_COMPLIANCE','driver_profile',profileId,`Saved Driver profile for ${staff.email}; assignment approval withheld`,now).run();
+    return NextResponse.json({ ok: true, approved: false, warning: `Profile saved, but assignment approval is blocked: ${reasons.filter((reason) => reason !== 'Driver is not approved for assignment').join('; ')}` });
   }
   await env.DB.prepare('INSERT INTO audit_events(owner_id,actor_email,action,entity_type,entity_id,summary,created_at) VALUES(?,?,?,?,?,?,?)').bind(user.ownerId, user.email, 'UPDATE_DRIVER_COMPLIANCE', 'driver_profile', profileId, `Updated Driver compliance for ${staff.email}`, now).run();
   return NextResponse.json({ ok: true, eligibility_reasons: eligibilityReasons(updated) });
