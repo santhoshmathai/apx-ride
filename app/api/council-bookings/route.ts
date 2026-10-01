@@ -4,7 +4,7 @@ import { getPortalAdmin } from '../../portal-auth';
 
 const columns = [
   ['reference', 'Booking reference'], ['booking_received_at', 'Booking received'], ['responded_by', 'Booking taken/responded by'],
-  ['responded_at', 'Response recorded'], ['pickup_at', 'Journey date/time'], ['passenger_name', 'Hirer/passenger'],
+  ['responded_at', 'Response recorded'], ['pickup_at', 'Journey date/time'], ['hirer_name', 'Hirer'], ['passenger_name', 'Passenger'],
   ['phone', 'Contact telephone'], ['customer_email', 'Contact email'], ['pickup', 'Pickup'], ['dropoff', 'Destination'],
   ['fare', 'Agreed fare GBP'], ['driver_name', 'Driver name'], ['driver_licence', 'Driver licence number'],
   ['vehicle_registration', 'Vehicle registration'], ['vehicle_licence', 'PH vehicle licence number'],

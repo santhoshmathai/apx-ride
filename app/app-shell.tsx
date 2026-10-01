@@ -35,6 +35,7 @@ import { StaffAccess, StaffAccessSummary } from './staff-access';
 
 type Booking = {
   id: number;
+  hirer_name?: string;
   passenger_name: string;
   customer_email?: string;
   phone: string;
@@ -695,7 +696,7 @@ function Bookings({
   add: () => void;
   messageTemplates: MessageTemplates;
 }) {
-  const [tab, setTab] = useState<'active' | 'progress' | 'complete'>('active');
+  const [tab, setTab] = useState<'active' | 'progress' | 'complete' | 'cancelled'>('active');
   const [messaging, setMessaging] = useState<Booking | null>(null),
     [assigning, setAssigning] = useState<Booking | null>(null),
     [from, setFrom] = useState(''),
@@ -704,6 +705,8 @@ function Bookings({
   const filtered = items.filter((b) =>
     tab === 'complete'
       ? b.status === 'complete'
+      : tab === 'cancelled'
+        ? ['cancelled','canceled','archived'].includes(b.status)
       : tab === 'progress'
         ? b.status === 'in_progress'
         : b.status === 'upcoming',
@@ -726,6 +729,7 @@ function Bookings({
         >
           Active jobs
         </button>
+        <button className={tab === 'cancelled' ? 'active' : ''} onClick={() => setTab('cancelled')}>Cancelled ({items.filter((b) => ['cancelled','canceled','archived'].includes(b.status)).length})</button>
         <button
           className={tab === 'progress' ? 'active' : ''}
           onClick={() => setTab('progress')}
@@ -764,6 +768,7 @@ function Bookings({
               {b.status === 'complete' && <button className="invoice-action" onClick={() => printTripInvoice(b)} title="Generate trip invoice"><FileText /><span>Invoice</span></button>}
               {b.status === 'complete' && <button className="invoice-action" onClick={() => void sendInvoice(b)} title="Email formal invoice"><Mail /><span>Email invoice</span></button>}
               {b.status !== 'complete' && <button onClick={() => edit(b)} title="Edit booking"><Pencil /></button>}
+              {b.status === 'upcoming' && <button className="invoice-action" onClick={() => done(b.id, 'in_progress')} title="Mark journey en route"><Navigation /><span>En Route</span></button>}
               {b.status !== 'complete' && <button onClick={() => setAssigning(b)} title="Assignment and Driver payment"><UsersRound /><span>Assign</span></button>}
               {b.status !== 'complete' && <button onClick={() => setMessaging(b)} title="Message passenger"><Mail /></button>}
               {b.status !== 'complete' && <button onClick={() => remove(b.id)} title="Remove"><Trash2 /></button>}
@@ -1425,6 +1430,7 @@ function BookingModal({
           </button>
         </header>
         <div className="form-grid">
+          <label>Hirer name<input name="hirerName" defaultValue={booking?.hirer_name || booking?.passenger_name} required /></label>
           <label>
             Passenger name
             <input
@@ -1433,6 +1439,7 @@ function BookingModal({
               required
             />
           </label>
+          <label>Booking taken date &amp; time<input name="bookingReceivedAt" type="datetime-local" defaultValue={(booking?.booking_received_at || new Date().toISOString()).slice(0,16)} required /></label>
           <label>
             Contact
             <input name="phone" defaultValue={booking?.phone} />
@@ -1535,22 +1542,6 @@ function BookingModal({
               defaultValue={booking?.fare || 0}
             />
           </label>
-          <label>
-            Base journey fare (£)
-            <input name="baseFare" type="number" step="0.01" min="0" defaultValue={booking?.base_fare || booking?.fare || 0} />
-          </label>
-          <label>
-            Airport fee (£)
-            <input name="airportFee" type="number" step="0.01" min="0" defaultValue={booking?.airport_fee || 0} />
-          </label>
-          <label>
-            Toll fee (£)
-            <input name="tollFee" type="number" step="0.01" min="0" defaultValue={booking?.toll_fee || 0} />
-          </label>
-          <label>
-            Tariff
-            <select name="tariff" defaultValue={booking?.tariff || 'day'}><option value="day">Day</option><option value="night">Night / Holiday</option></select>
-          </label>
           <label className="wide">
             Notes
             <textarea name="notes" rows={3} defaultValue={booking?.notes} />
@@ -1597,6 +1588,7 @@ function BookingDetail({
           <span>{b.dropoff}</span>
         </div>
         <dl>
+          <div><dt>Hirer</dt><dd>{b.hirer_name || b.passenger_name}</dd></div>
           <div>
             <dt>Date & time</dt>
             <dd>
@@ -1655,16 +1647,16 @@ function BookingDetail({
 
 function Calendar({ items }: { items: Booking[] }) {
   const [tab, setTab] = useState<'list' | 'calendar'>('list'),
-    [periods, setPeriods] = useState<Array<{ id: number; unavailable_date: string; full_day: number; start_time: string; end_time: string; reason: string }>>([]),
+    [periods, setPeriods] = useState<Array<{ id: number; unavailable_date: string; unavailable_until: string; full_day: number; start_time: string; end_time: string; reason: string }>>([]),
     [marking, setMarking] = useState(false),
     [day, setDay] = useState(new Date().toISOString().slice(0, 10)),
     [visibleMonth, setVisibleMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1, 12));
   const refreshAvailability = () => fetch('/api/availability').then((r) => r.json()).then((d) => Array.isArray(d) && setPeriods(d));
   useEffect(() => { void refreshAvailability(); }, []);
   const jobs = items
-    .filter((b) => b.status !== 'archived' && b.status !== 'complete')
+    .filter((b) => !['archived','complete','cancelled','canceled'].includes(b.status))
     .sort((a, b) => a.pickup_at.localeCompare(b.pickup_at));
-  const unavailable = (d: string) => periods.find((period) => period.unavailable_date === d);
+  const unavailable = (d: string) => periods.find((period) => d >= period.unavailable_date && d <= (period.unavailable_until || period.unavailable_date));
   const removeUnavailable = async (id: number) => { if (!confirm('Remove this unavailable period?')) return; await fetch(`/api/availability?id=${id}`, { method: 'DELETE' }); void refreshAvailability(); };
   const month = Array.from({ length: 42 }, (_, i) => {
     const d = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1, 12);
@@ -1728,7 +1720,7 @@ function Calendar({ items }: { items: Booking[] }) {
       ) : (
         <>
           <section className="panel availability">
-            <Head over="AVAILABILITY" title="Mark an unavailable day" />
+            <Head over="AVAILABILITY" title="Mark an unavailable date and time range" />
             <div className="add-row">
               <input
                 type="date"
@@ -1737,7 +1729,7 @@ function Calendar({ items }: { items: Booking[] }) {
               />
               <button className="primary" onClick={() => setMarking(true)}>
                 <Plus />
-                Add unavailable day
+                Add unavailable range
               </button>
             </div>
           </section>
@@ -1802,9 +1794,8 @@ function Calendar({ items }: { items: Booking[] }) {
   );
 }
 function AvailabilityModal({ day, close, saved }: { day: string; close: () => void; saved: () => void }) {
-  const [fullDay, setFullDay] = useState(true);
-  const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const data = Object.fromEntries(new FormData(event.currentTarget)); const response = await fetch('/api/availability', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ date: data.date, fullDay, startTime: data.startTime || '', endTime: data.endTime || '', reason: data.reason || '' }) }); if (response.ok) saved(); else alert('Availability could not be saved.'); };
-  return <div className="modal"><button className="scrim" onClick={close} /><form className="payment-card" onSubmit={submit}><header><div><small>DISPATCH AVAILABILITY</small><h2>Add unavailable period</h2></div><button type="button" onClick={close}><X /></button></header><label>Date<input name="date" type="date" defaultValue={day} required /></label><label className="check-label"><input type="checkbox" checked={fullDay} onChange={(e) => setFullDay(e.target.checked)} />Full day</label>{!fullDay && <div className="form-grid"><label>Start time<input name="startTime" type="time" required /></label><label>End time<input name="endTime" type="time" required /></label></div>}<label>Reason<input name="reason" placeholder="Holiday, appointment, vehicle maintenance…" required /></label><footer><button type="button" onClick={close}>Cancel</button><button className="primary"><Save />Save unavailable period</button></footer></form></div>;
+  const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const data = Object.fromEntries(new FormData(event.currentTarget)); const response = await fetch('/api/availability', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ startDate: data.startDate, endDate: data.endDate, startTime: data.startTime, endTime: data.endTime, reason: data.reason || '' }) }); if (response.ok) saved(); else { const value=await response.json().catch(()=>({})) as {error?:string}; alert(value.error||'Availability could not be saved.'); } };
+  return <div className="modal"><button className="scrim" onClick={close} /><form className="payment-card" onSubmit={submit}><header><div><small>DISPATCH AVAILABILITY</small><h2>Add unavailable range</h2></div><button type="button" onClick={close}><X /></button></header><div className="form-grid"><label>Start date<input name="startDate" type="date" defaultValue={day} required /></label><label>End date<input name="endDate" type="date" defaultValue={day} required /></label><label>Start time<input name="startTime" type="time" required /></label><label>End time<input name="endTime" type="time" required /></label></div><label>Reason<input name="reason" placeholder="Holiday, appointment, vehicle maintenance…" required /></label><footer><button type="button" onClick={close}>Cancel</button><button className="primary"><Save />Save unavailable range</button></footer></form></div>;
 }
 function Messages({ items, templates, saveTemplates }: { items: Booking[]; templates: MessageTemplates; saveTemplates: (templates: MessageTemplates) => void }) {
   const messageJobs = items.filter(

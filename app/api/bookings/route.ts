@@ -61,17 +61,18 @@ export async function POST(req: Request) {
     const b = (await req.json()) as Record<string, unknown>;
     const now = new Date().toISOString();
     const result = await env.DB.prepare(
-      `INSERT INTO bookings(owner_id,passenger_name,customer_email,phone,pickup,dropoff,pickup_at,booking_received_at,responded_by,responded_at,operator,driver_call_sign,driver_name,driver_licence,booking_type,passengers,large_bags,small_bags,fleet_tier,distance,fare,base_fare,airport_fee,toll_fee,tariff,status,notes,retention_until,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO bookings(owner_id,hirer_name,passenger_name,customer_email,phone,pickup,dropoff,pickup_at,booking_received_at,responded_by,responded_at,operator,driver_call_sign,driver_name,driver_licence,booking_type,passengers,large_bags,small_bags,fleet_tier,distance,fare,base_fare,airport_fee,toll_fee,tariff,status,notes,retention_until,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     )
       .bind(
         user.userId,
+        b.hirerName || b.passengerName || 'Unnamed hirer',
         b.passengerName || 'Unnamed passenger',
         b.customerEmail || '',
         b.phone || '',
         b.pickup || '',
         b.dropoff || '',
         b.pickupAt || now,
-        now,
+        b.bookingReceivedAt || now,
         user.email,
         now,
         b.operator || 'APX RIDE',
@@ -140,15 +141,17 @@ export async function PUT(req: Request) {
     await ready();
     const b = (await req.json()) as Record<string, unknown>;
     await env.DB.prepare(
-      `UPDATE bookings SET passenger_name=?,customer_email=?,phone=?,pickup=?,dropoff=?,pickup_at=?,operator=?,driver_call_sign=?,driver_name=?,driver_licence=?,booking_type=?,passengers=?,large_bags=?,small_bags=?,fleet_tier=?,distance=?,fare=?,base_fare=?,airport_fee=?,toll_fee=?,tariff=?,notes=?,retention_until=?,updated_at=? WHERE id=? AND owner_id=?`,
+      `UPDATE bookings SET hirer_name=?,passenger_name=?,customer_email=?,phone=?,pickup=?,dropoff=?,pickup_at=?,booking_received_at=?,operator=?,driver_call_sign=?,driver_name=?,driver_licence=?,booking_type=?,passengers=?,large_bags=?,small_bags=?,fleet_tier=?,distance=?,fare=?,notes=?,retention_until=?,updated_at=? WHERE id=? AND owner_id=?`,
     )
       .bind(
+        b.hirerName || b.passengerName || 'Unnamed hirer',
         b.passengerName || 'Unnamed passenger',
         b.customerEmail || '',
         b.phone || '',
         b.pickup || '',
         b.dropoff || '',
         b.pickupAt || new Date().toISOString(),
+        b.bookingReceivedAt || new Date().toISOString(),
         b.operator || 'APX RIDE',
         b.driverCallSign || '',
         b.driverName || '',
@@ -160,10 +163,6 @@ export async function PUT(req: Request) {
         b.fleetTier || 'Saloon',
         b.distance || 0,
         b.fare || 0,
-        b.baseFare || 0,
-        b.airportFee || 0,
-        b.tollFee || 0,
-        b.tariff || 'day',
         b.notes || '',
         retentionDate(b.pickupAt),
         new Date().toISOString(),
