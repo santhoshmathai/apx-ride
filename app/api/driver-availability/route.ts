@@ -6,9 +6,9 @@ import { validMutationOrigin } from '../../request-security';
 export async function POST(req: Request) {
   if(!validMutationOrigin(req))return NextResponse.json({error:'Invalid request origin'},{status:403});
   const user = await getPortalPrincipal(); if (!user || user.role !== 'DRIVER') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-  const body = await req.json() as { date?: unknown; fullDay?: unknown; startTime?: unknown; endTime?: unknown; reason?: unknown }; const date = String(body.date || ''); const fullDay = body.fullDay !== false; const start = String(body.startTime || ''); const end = String(body.endTime || '');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || (!fullDay && (!/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end) || start >= end))) return NextResponse.json({ error: 'Valid availability date and time required' }, { status: 400 });
-  const result = await env.DB.prepare('INSERT INTO driver_availability(owner_id,organisation_id,driver_staff_id,unavailable_date,full_day,start_time,end_time,reason,created_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(user.ownerId, user.organisationId, user.userId, date, fullDay ? 1 : 0, fullDay ? '' : start, fullDay ? '' : end, String(body.reason || '').slice(0, 300), new Date().toISOString()).run(); return NextResponse.json({ id: result.meta.last_row_id }, { status: 201 });
+  const body = await req.json() as { startDate?: unknown; endDate?: unknown; startTime?: unknown; endTime?: unknown; reason?: unknown }; const startDate=String(body.startDate||''),endDate=String(body.endDate||''),start=String(body.startTime||''),end=String(body.endTime||'');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(startDate)||!/^\d{4}-\d{2}-\d{2}$/.test(endDate)||endDate<startDate||!/^\d{2}:\d{2}$/.test(start)||!/^\d{2}:\d{2}$/.test(end)||(startDate===endDate&&end<=start))return NextResponse.json({error:'Start Date, End Date, Start Time and End Time must form a valid range'},{status:400});
+  const result = await env.DB.prepare('INSERT INTO driver_availability(owner_id,organisation_id,driver_staff_id,unavailable_date,unavailable_until,full_day,start_time,end_time,reason,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(user.ownerId,user.organisationId,user.userId,startDate,endDate,0,start,end,String(body.reason||'').slice(0,300),new Date().toISOString()).run(); return NextResponse.json({ id: result.meta.last_row_id }, { status: 201 });
 }
 export async function DELETE(req: Request) {
   if(!validMutationOrigin(req))return NextResponse.json({error:'Invalid request origin'},{status:403});

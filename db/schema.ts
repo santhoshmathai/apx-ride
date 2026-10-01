@@ -84,6 +84,7 @@ export const driverAvailability = sqliteTable('driver_availability', {
   organisationId: text('organisation_id').notNull(),
   driverStaffId: text('driver_staff_id').notNull(),
   unavailableDate: text('unavailable_date').notNull(),
+  unavailableUntil: text('unavailable_until').notNull().default(''),
   fullDay: integer('full_day').notNull().default(1),
   startTime: text('start_time').notNull().default(''),
   endTime: text('end_time').notNull().default(''),
