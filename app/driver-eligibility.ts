@@ -61,4 +61,7 @@ export const driverEligibilitySelect = `
     v.private_hire_vehicle_licence_number,v.private_hire_vehicle_licence_expiry,v.mot_expiry,v.insurance_expiry,v.v5_document_status
   FROM portal_staff s
   LEFT JOIN driver_profiles p ON p.staff_id=s.id AND p.organisation_id=s.organisation_id
-  LEFT JOIN driver_vehicles v ON v.driver_profile_id=p.id AND v.organisation_id=s.organisation_id`;
+  LEFT JOIN driver_vehicles v ON v.id=COALESCE(
+    (SELECT a.vehicle_id FROM driver_vehicle_assignments a WHERE a.driver_profile_id=p.id AND a.organisation_id=s.organisation_id AND a.active=1 AND a.approved=1 ORDER BY a.primary_vehicle DESC,a.id DESC LIMIT 1),
+    (SELECT legacy.id FROM driver_vehicles legacy WHERE legacy.driver_profile_id=p.id AND legacy.organisation_id=s.organisation_id AND legacy.active=1 ORDER BY legacy.id DESC LIMIT 1)
+  ) AND v.organisation_id=s.organisation_id`;

@@ -134,6 +134,13 @@
       "when": 1790864625001,
       "tag": "0018_real_johnny_blaze",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1790866469720,
+      "tag": "0019_certain_cobalt_man",
+      "breakpoints": true
     }
   ]
 }

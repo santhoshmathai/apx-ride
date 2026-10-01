@@ -2,7 +2,8 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Download, FileDown, Plus, Save, X } from 'lucide-react';
-import { DriverProfileEditor, type StaffMember } from './staff-access';
+import { CouncilStaffRegister, DriverProfileEditor, StaffAccess, type StaffMember } from './staff-access';
+import { FleetOverview } from './vehicle-register';
 
 type RecordRow = {
   id: number;
@@ -122,20 +123,26 @@ const schemas: Record<string, { label: string; singular: string; fields: Field[]
 };
 
 export function RecordsHub() {
-  const [tab, setTab] = useState('drivers');
+  const [tab, setTab] = useState('overview');
   return (
     <>
       <section className="page-head">
-        <div><h2>Records Hub</h2><p>Operational registers, financial records and council-ready audit exports.</p></div>
+        <div><h2>Records &amp; Compliance</h2><p>People, portal access, fleet compliance, operational registers and council-ready exports.</p></div>
       </section>
       <div className="records-category-nav">
-        <section><b>1. ROSTER &amp; FLEET</b><div className="view-tabs"><button className={tab==='drivers'?'active':''} onClick={()=>setTab('drivers')}>Drivers</button><button className={tab==='vehicles'?'active':''} onClick={()=>setTab('vehicles')}>Vehicles</button><button className={tab==='dismissed_driver'?'active':''} onClick={()=>setTab('dismissed_driver')}>Driver Departures</button><button className={tab==='licence_change'?'active':''} onClick={()=>setTab('licence_change')}>Licence Changes</button></div></section>
-        <section><b>2. INCIDENTS &amp; LOGS</b><div className="view-tabs"><button className={tab==='lost_property'?'active':''} onClick={()=>setTab('lost_property')}>Lost Property</button><button className={tab==='complaint'?'active':''} onClick={()=>setTab('complaint')}>Complaints</button><button className={tab==='assistance_dog'?'active':''} onClick={()=>setTab('assistance_dog')}>Assistance Dogs</button></div></section>
-        <section><b>3. AUDIT &amp; PROCEDURES</b><div className="view-tabs"><button className={tab==='council_incident'?'active':''} onClick={()=>setTab('council_incident')}>Incident Report</button><button className={tab==='procedures'?'active':''} onClick={()=>setTab('procedures')}>Standard Procedures</button></div></section>
+        <section><b>Overview</b><div className="view-tabs"><button className={tab==='overview'?'active':''} onClick={()=>setTab('overview')}>Compliance overview</button></div></section>
+        <section><b>People &amp; Access</b><div className="view-tabs"><button className={tab==='access'?'active':''} onClick={()=>setTab('access')}>Portal Users</button><button className={tab==='booking_staff'?'active':''} onClick={()=>setTab('booking_staff')}>Booking &amp; Dispatch Staff</button><button className={tab==='drivers'?'active':''} onClick={()=>setTab('drivers')}>Drivers</button><button className={tab==='dismissed_driver'?'active':''} onClick={()=>setTab('dismissed_driver')}>Departures</button></div></section>
+        <section><b>Fleet</b><div className="view-tabs"><button className={tab==='vehicles'?'active':''} onClick={()=>setTab('vehicles')}>Vehicles</button><button className={tab==='vehicle_assignments'?'active':''} onClick={()=>setTab('vehicle_assignments')}>Driver–Vehicle Assignments</button><button className={tab==='vehicle_expiry'?'active':''} onClick={()=>setTab('vehicle_expiry')}>Expiring Documents</button></div></section>
+        <section><b>Incidents &amp; Logs</b><div className="view-tabs"><button className={tab==='lost_property'?'active':''} onClick={()=>setTab('lost_property')}>Lost Property</button><button className={tab==='complaint'?'active':''} onClick={()=>setTab('complaint')}>Complaints</button><button className={tab==='assistance_dog'?'active':''} onClick={()=>setTab('assistance_dog')}>Assistance Dogs</button><button className={tab==='council_incident'?'active':''} onClick={()=>setTab('council_incident')}>Incident Reports</button></div></section>
+        <section><b>Audit &amp; Procedures</b><div className="view-tabs"><button className={tab==='licence_change'?'active':''} onClick={()=>setTab('licence_change')}>Licence Changes</button><button className={tab==='procedures'?'active':''} onClick={()=>setTab('procedures')}>Standard Procedures</button></div></section>
       </div>
-      {tab === 'drivers' || tab === 'vehicles' ? <CanonicalDriverRegister view={tab} /> : tab === 'procedures' ? <CouncilProcedures /> : <Register type={tab} />}
+      {tab === 'overview' ? <RecordsOverview navigate={setTab}/> : tab === 'access' ? <StaffAccess embedded showCouncilStaff={false}/> : tab === 'booking_staff' ? <CouncilStaffRegister/> : tab === 'drivers' ? <CanonicalDriverRegister view="drivers"/> : tab === 'vehicles' ? <FleetOverview mode="vehicles"/> : tab === 'vehicle_assignments' ? <FleetOverview mode="assignments"/> : tab === 'vehicle_expiry' ? <FleetOverview mode="expiring"/> : tab === 'procedures' ? <CouncilProcedures /> : <Register type={tab} />}
     </>
   );
+}
+
+function RecordsOverview({navigate}:{navigate:(tab:string)=>void}) {
+  return <section className="records-overview-grid"><button className="panel" onClick={()=>navigate('access')}><small>PEOPLE &amp; ACCESS</small><strong>Portal users and permissions</strong><span>Manage sign-in, roles, onboarding and offboarding.</span></button><button className="panel" onClick={()=>navigate('booking_staff')}><small>COUNCIL REGISTER</small><strong>Booking &amp; dispatch staff</strong><span>DBS sighting, suitability and operational duties.</span></button><button className="panel" onClick={()=>navigate('drivers')}><small>DRIVERS</small><strong>Driver compliance</strong><span>Licences, evidence and assignment approval.</span></button><button className="panel" onClick={()=>navigate('vehicles')}><small>FLEET</small><strong>Vehicles and documents</strong><span>Add vehicles independently and monitor expiry dates.</span></button><button className="panel" onClick={()=>navigate('vehicle_assignments')}><small>ALLOCATION</small><strong>Driver–vehicle assignments</strong><span>Preserve current and historical fleet relationships.</span></button><button className="panel" onClick={()=>navigate('vehicle_expiry')}><small>ACTION REQUIRED</small><strong>Expiring documents</strong><span>Review MOT, insurance and PHV licence dates.</span></button></section>;
 }
 
 function CouncilProcedures() {
@@ -152,12 +159,12 @@ function CouncilProcedures() {
   return <section className="panel compliance-register"><header className="register-head"><div><small>COUNCIL DEMONSTRATION</small><h3>Operating procedure library</h3><p>Concise operating controls for demonstration. These do not replace the licence conditions or your full written policies.</p></div></header><div className="compliance-list">{procedures.map(([title,body])=><article className="compliance-row" key={title}><div className="record-summary-main"><b>{title}</b><span>{body}</span></div></article>)}</div></section>;
 }
 
-function CanonicalDriverRegister({ view }: { view: 'drivers' | 'vehicles' }) {
+function CanonicalDriverRegister({ view }: { view: 'drivers' }) {
   const [staff, setStaff] = useState<StaffMember[]>([]); const [editing, setEditing] = useState<StaffMember | null>(null); const [loading, setLoading] = useState(true);
   const refresh = useCallback(() => fetch('/api/staff').then((response) => response.json()).then((value) => setStaff(Array.isArray(value) ? value.filter((member: StaffMember) => member.has_driver_profile) : [])).finally(() => setLoading(false)), []);
   useEffect(() => { void refresh(); }, [refresh]);
   return <section className="panel compliance-register"><header className="register-head"><div><small>CANONICAL COMPLIANCE RECORDS</small><h3>{view === 'drivers' ? 'Driver register' : 'Vehicle register'}</h3><p>These records are the same verified profiles used by assignment eligibility. Access roles remain in Staff &amp; Access.</p></div></header>
-    {loading ? <p>Loading records…</p> : <div className="staff-list">{staff.map((member) => <div className="staff-row" key={member.id}><div><strong>{member.email}</strong><span>{member.role === 'OWNER_ADMIN' ? 'Owner/Admin with Driver profile' : 'Driver'} · Portal {member.active ? 'active' : 'disabled'}</span><span>{view === 'drivers' ? 'Driver identity, licence and address evidence' : 'Approved vehicle, PHV licence, MOT, insurance and V5'}</span></div><div className="staff-badges"><span className={member.approved_for_assignment ? 'verified' : 'pending'}>{member.approved_for_assignment ? 'Assignment eligible' : 'Compliance pending'}</span></div><button onClick={() => setEditing(member)}>View / update {view === 'drivers' ? 'Driver' : 'vehicle'}</button></div>)}</div>}
+    {loading ? <p>Loading records…</p> : <div className="staff-list">{staff.map((member) => <div className="staff-row" key={member.id}><div><strong>{member.full_name||member.email}</strong><span>{member.role === 'OWNER_ADMIN' ? 'Owner/Admin with Driver profile' : 'Driver'} · Portal {member.active ? 'active' : 'disabled'}</span><span>Driver identity, licence and address evidence</span></div><div className="staff-badges"><span className={member.approved_for_assignment ? 'verified' : 'pending'}>{member.approved_for_assignment ? 'Assignment eligible' : 'Compliance pending'}</span></div><button onClick={() => setEditing(member)}>View / update Driver</button></div>)}</div>}
     {!loading && !staff.length && <p className="empty-register">No canonical Driver profiles exist yet. Create portal access in Staff &amp; Access, then open the Driver record from there.</p>}
     {editing && <DriverProfileEditor member={editing} close={() => setEditing(null)} saved={async () => { setEditing(null); await refresh(); }} />}
   </section>;

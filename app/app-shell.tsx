@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { RecordsHub } from './records-hub';
 import { BookingRequests } from './booking-requests';
-import { StaffAccess, StaffAccessSummary } from './staff-access';
+import { StaffAccessSummary } from './staff-access';
 
 type Booking = {
   id: number;
@@ -112,9 +112,8 @@ const nav = [
   ['Calculator', FileText],
   ['Calendar', CalendarDays],
   ['Messages', MessageSquareText],
-  ['Records Hub', FolderLock],
+  ['Records & Compliance', FolderLock],
   ['Earnings', PoundSterling],
-  ['Staff & Access', UsersRound],
   ['Settings', Settings],
 ] as const;
 let activeTimeFormat: '12' | '24' = '24';
@@ -278,9 +277,8 @@ export function AppShell({ signOutPath, account }: { signOutPath: string; accoun
           )}
           {active === 'Calendar' && <Calendar items={bookings} />}
           {active === 'Messages' && <Messages items={bookings} templates={messageTemplates} saveTemplates={saveMessageTemplates} />}
-          {active === 'Records Hub' && <RecordsHub />}
+          {active === 'Records & Compliance' && <RecordsHub />}
           {active === 'Earnings' && <EarningsV2 items={bookings} status={status} />}
-          {active === 'Staff & Access' && <StaffAccess />}
           {active === 'Settings' && (
             <SettingsPage
               operators={operators}
@@ -421,7 +419,7 @@ function Dashboard({
           detail={`${operators.length} booking sources`}
         />
       </div>
-      <StaffAccessSummary open={() => go('Staff & Access')} />
+      <StaffAccessSummary open={() => go('Records & Compliance')} />
       <TodayJobs jobs={upcoming.filter((booking) => booking.pickup_at.slice(0, 10) === new Date().toISOString().slice(0, 10))} go={go} />
     </>
   );

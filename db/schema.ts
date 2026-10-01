@@ -273,7 +273,7 @@ export const driverVehicles = sqliteTable('driver_vehicles', {
   id: text('id').primaryKey(),
   organisationId: text('organisation_id').notNull(),
   ownerId: text('owner_id').notNull(),
-  driverProfileId: text('driver_profile_id').notNull(),
+  driverProfileId: text('driver_profile_id').notNull().default(''),
   registration: text('registration').notNull().default(''),
   makeModelColour: text('make_model_colour').notNull().default(''),
   vehicleMake: text('vehicle_make').notNull().default(''),
@@ -291,9 +291,26 @@ export const driverVehicles = sqliteTable('driver_vehicles', {
   v5DocumentStatus: text('v5_document_status').notNull().default('MISSING'),
   approved: integer('approved').notNull().default(0),
   active: integer('active').notNull().default(1),
+  availableFrom: text('available_from').notNull().default(''),
+  availableUntil: text('available_until').notNull().default(''),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
-}, (table) => [uniqueIndex('idx_driver_vehicles_profile').on(table.driverProfileId)]);
+}, (table) => [index('idx_driver_vehicles_profile').on(table.driverProfileId), uniqueIndex('idx_driver_vehicles_registration').on(table.organisationId, table.registration)]);
+
+export const driverVehicleAssignments = sqliteTable('driver_vehicle_assignments', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  organisationId: text('organisation_id').notNull(),
+  ownerId: text('owner_id').notNull(),
+  driverProfileId: text('driver_profile_id').notNull(),
+  vehicleId: text('vehicle_id').notNull(),
+  validFrom: text('valid_from').notNull(),
+  validUntil: text('valid_until').notNull().default(''),
+  primaryVehicle: integer('primary_vehicle').notNull().default(0),
+  active: integer('active').notNull().default(1),
+  approved: integer('approved').notNull().default(0),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => [index('idx_driver_vehicle_assignment_driver').on(table.organisationId, table.driverProfileId), index('idx_driver_vehicle_assignment_vehicle').on(table.organisationId, table.vehicleId)]);
 
 export const profileDocuments = sqliteTable('profile_documents', {
   id: integer('id').primaryKey({ autoIncrement: true }),

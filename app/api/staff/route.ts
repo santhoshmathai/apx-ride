@@ -7,7 +7,7 @@ export async function GET() {
   if (!cloudflareAuthEnabled()) return NextResponse.json({ error: 'Not available in Sites mode' }, { status: 404 });
   const user = await getPortalPrincipal();
   if (!user || user.role !== 'OWNER_ADMIN') return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-  const rows = await env.DB.prepare("SELECT s.id,s.email,s.role,s.active,s.created_at,s.last_login_at,CASE WHEN s.access_subject IS NULL THEN 0 ELSE 1 END AS identity_verified,CASE WHEN p.id IS NULL THEN 0 ELSE 1 END AS has_driver_profile,COALESCE(p.approved_for_assignment,0) AS approved_for_assignment FROM portal_staff s LEFT JOIN driver_profiles p ON p.staff_id=s.id AND p.organisation_id=s.organisation_id WHERE s.organisation_id=? AND s.owner_id=? ORDER BY CASE s.role WHEN 'OWNER_ADMIN' THEN 0 ELSE 1 END,s.email").bind(user.organisationId, user.ownerId).all();
+  const rows = await env.DB.prepare("SELECT s.id,s.email,s.role,s.active,s.created_at,s.last_login_at,p.id AS profile_id,p.full_name,CASE WHEN s.access_subject IS NULL THEN 0 ELSE 1 END AS identity_verified,CASE WHEN p.id IS NULL THEN 0 ELSE 1 END AS has_driver_profile,COALESCE(p.approved_for_assignment,0) AS approved_for_assignment FROM portal_staff s LEFT JOIN driver_profiles p ON p.staff_id=s.id AND p.organisation_id=s.organisation_id WHERE s.organisation_id=? AND s.owner_id=? ORDER BY CASE s.role WHEN 'OWNER_ADMIN' THEN 0 ELSE 1 END,s.email").bind(user.organisationId, user.ownerId).all();
   return NextResponse.json(rows.results);
 }
 
