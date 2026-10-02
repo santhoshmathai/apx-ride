@@ -843,9 +843,9 @@ function CanonicalDriverRegister({ view }: { view: 'drivers' }) {
     event.preventDefault();
     const form=event.currentTarget,email=String(new FormData(form).get('email')||'').trim().toLowerCase();
     const response=await fetch('/api/staff',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email})});
-    const result=await response.json() as {error?:string};
+    const result=await response.json() as {error?:string;ownerDriver?:boolean};
     if(!response.ok){setMessage(result.error||'Could not add Driver');return;}
-    form.reset(); setMessage(`${email} created. Add the same email to Cloudflare Access, then complete this Driver profile.`); await refresh();
+    form.reset(); setMessage(result.ownerDriver?`${email} now has an Owner/Admin Driver profile. Complete its compliance record and map an approved vehicle. No additional Cloudflare access entry is required.`:`${email} created. Add the same email to Cloudflare Access, then complete this Driver profile.`); await refresh();
   };
   const exportDriver=async(member:StaffMember)=>{const profile=await fetch(`/api/driver-profiles?staffId=${encodeURIComponent(member.id)}`).then(r=>r.json()) as Record<string,unknown>;const fields=Object.entries(profile).filter(([key])=>key!=='eligibility_reasons');const csv=[fields.map(([key])=>`"${key.replaceAll('"','""')}"`).join(','),fields.map(([,value])=>`"${String(value??'').replaceAll('"','""')}"`).join(',')].join('\r\n');download('\ufeff'+csv,`apx-driver-${(member.full_name||member.email).replace(/[^a-z0-9]+/gi,'-').toLowerCase()}.csv`,'text/csv;charset=utf-8');};
   return (

@@ -133,12 +133,12 @@ export function StaffAccess({
         },
         body: JSON.stringify({ email }),
       });
-      const value = (await response.json()) as { error?: string };
+      const value = (await response.json()) as { error?: string; ownerDriver?: boolean; alreadyExists?: boolean };
       if (!response.ok) throw new Error(value.error || 'Could not add Driver');
       form.reset();
-      setNotice(
-        `${email} was created in the portal. Now manually add the exact email to the Cloudflare Access policy.`,
-      );
+      setNotice(value.ownerDriver
+        ? `${email} now has an Owner/Admin Driver profile. Complete its compliance record and map an approved vehicle in Operations. No additional Cloudflare access entry is required.`
+        : `${email} was created in the portal. Now manually add the exact email to the Cloudflare Access policy.`);
       await refresh();
     } catch (reason) {
       setError(
@@ -210,10 +210,10 @@ export function StaffAccess({
     (member) => member.role === 'OWNER_ADMIN' && member.active,
   ).length;
   const activeDrivers = staff.filter(
-    (member) => member.role === 'DRIVER' && member.active,
+    (member) => Boolean(member.has_driver_profile) && member.active,
   ).length;
   const inactiveDrivers = staff.filter(
-    (member) => member.role === 'DRIVER' && !member.active,
+    (member) => Boolean(member.has_driver_profile) && !member.active,
   ).length;
   return (
     <section className={`staff-access-page ${embedded ? 'embedded' : ''}`}>
@@ -356,7 +356,7 @@ export function StaffAccess({
                   ) : null}
                 </div>
                 <div className="staff-row-actions">
-                  {member.has_driver_profile && (
+                  {Boolean(member.has_driver_profile) && (
                     <button
                       onClick={() =>
                         window.dispatchEvent(

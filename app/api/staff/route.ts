@@ -19,8 +19,20 @@ export async function POST(req: Request) {
   const body = await req.json() as { email?: unknown };
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return NextResponse.json({ error: 'Valid driver email required' }, { status: 400 });
-  const id = crypto.randomUUID();
   const now = new Date().toISOString();
+  const existingStaff = await env.DB.prepare('SELECT id,role FROM portal_staff WHERE organisation_id=? AND owner_id=? AND email=?').bind(user.organisationId,user.ownerId,email).first<{id:string;role:string}>();
+  if (existingStaff) {
+    if (existingStaff.role !== 'OWNER_ADMIN') return NextResponse.json({ error: 'Email already provisioned as a Driver' }, { status: 409 });
+    const existingProfile = await env.DB.prepare('SELECT id FROM driver_profiles WHERE staff_id=? AND organisation_id=?').bind(existingStaff.id,user.organisationId).first<{id:string}>();
+    if (existingProfile) return NextResponse.json({ id: existingStaff.id, email, role: 'OWNER_ADMIN', ownerDriver: true, alreadyExists: true });
+    const profileId=crypto.randomUUID();
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO driver_profiles(id,organisation_id,owner_id,staff_id,active,approved_for_assignment,created_at,updated_at) VALUES(?,?,?,?,1,0,?,?)").bind(profileId,user.organisationId,user.ownerId,existingStaff.id,now,now),
+      env.DB.prepare('INSERT INTO audit_events(owner_id,actor_email,action,entity_type,entity_id,summary,created_at) VALUES(?,?,?,?,?,?,?)').bind(user.ownerId,user.email,'PROVISION_OWNER_DRIVER','driver_profile',profileId,`Created Owner/Admin Driver profile for ${email}`,now),
+    ]);
+    return NextResponse.json({ id: existingStaff.id, email, role: 'OWNER_ADMIN', ownerDriver: true }, { status: 201 });
+  }
+  const id = crypto.randomUUID();
   try {
     await env.DB.batch([
       env.DB.prepare("INSERT INTO portal_staff(id,organisation_id,owner_id,email,role,active,created_at,updated_at) VALUES(?,?,?,?, 'DRIVER',1,?,?)").bind(id, user.organisationId, user.ownerId, email, now, now),
@@ -28,7 +40,7 @@ export async function POST(req: Request) {
     ]);
   } catch { return NextResponse.json({ error: 'Email already provisioned' }, { status: 409 }); }
   await env.DB.prepare('INSERT INTO audit_events(owner_id,actor_email,action,entity_type,entity_id,summary,created_at) VALUES(?,?,?,?,?,?,?)').bind(user.ownerId, user.email, 'PROVISION_DRIVER', 'portal_staff', id, `Provisioned ${email}`, now).run();
-  return NextResponse.json({ id, email, role: 'DRIVER' }, { status: 201 });
+  return NextResponse.json({ id, email, role: 'DRIVER', ownerDriver: false }, { status: 201 });
 }
 
 export async function PATCH(req: Request) {
