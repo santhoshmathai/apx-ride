@@ -772,7 +772,7 @@ function Bookings({
               {b.status === 'complete' && <button className="invoice-action" onClick={() => void shareReceiptByEmail(b)} title="Prepare receipt and open email"><Mail /><span>Email receipt</span></button>}
               {b.status === 'complete' && <button className="invoice-action" onClick={() => void sendInvoice(b)} title="Email formal invoice"><Mail /><span>Email invoice</span></button>}
               {b.status !== 'complete' && <button onClick={() => edit(b)} title="Edit booking"><Pencil /></button>}
-              {b.status === 'upcoming' && <button className="invoice-action" onClick={() => setAssigning(b)} title="Assignment and Driver payment"><UsersRound /><span>Assign Driver</span></button>}
+              {['upcoming','in_progress'].includes(b.status) && <button onClick={() => setAssigning(b)} title="Assign Driver / manage assignment" aria-label="Assign Driver / manage assignment"><UsersRound /></button>}
               {b.status === 'upcoming' && <button className="invoice-action" onClick={() => done(b.id, 'in_progress')} title="Mark journey en route"><Navigation /><span>En Route</span></button>}
               {b.status === 'in_progress' && <button className="invoice-action" onClick={() => done(b.id, 'upcoming')} title="Return this journey to active jobs"><Undo2 /><span>Back to active</span></button>}
               {b.status === 'in_progress' && <button className="invoice-action" onClick={() => setFinishing(b)} title="Finish journey and record payment"><Check /><span>Finish job</span></button>}
