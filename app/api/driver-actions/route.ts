@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { NextResponse } from 'next/server';
-import { addAssignmentEvent, transitionAssignment, type AssignmentRow } from '../../assignment-workflow';
+import { addAssignmentEvent, scheduleConflicts, transitionAssignment, type AssignmentRow } from '../../assignment-workflow';
+import { driverEligibilitySelect, driverOnlyEligibilityReasons, vehicleEligibilityReasons, type AssignmentVehicleRow, type DriverEligibilityRow } from '../../driver-eligibility';
 import { getPortalPrincipal } from '../../portal-auth';
 import { validMutationOrigin } from '../../request-security';
 
@@ -30,5 +31,16 @@ export async function POST(req: Request) {
   }
   const transition = transitions[action]; if (!transition || !transition.from.includes(row.status) || !row.active) return NextResponse.json({ error: 'This action is not available for the current assignment state' }, { status: 409 });
   const note = String(body.note || '').trim(); if (['DECLINE','NO_SHOW','INCIDENT'].includes(action) && !note) return NextResponse.json({ error: 'Please provide a reason or incident note' }, { status: 400 });
+  if (action === 'EN_ROUTE') {
+    const driver = await env.DB.prepare(`${driverEligibilitySelect} WHERE s.id=? AND s.organisation_id=? AND s.owner_id=?`).bind(user.userId,user.organisationId,user.ownerId).first<Record<string,unknown>&DriverEligibilityRow>();
+    const vehicle = await env.DB.prepare(`SELECT v.id,v.registration,v.vehicle_make,v.vehicle_model,v.vehicle_colour,v.vehicle_category,v.active AS vehicle_active,v.approved AS vehicle_approved,v.private_hire_vehicle_licence_number,v.private_hire_vehicle_licence_expiry,v.mot_expiry,v.insurance_expiry,v.v5_document_status FROM driver_vehicles v JOIN driver_profiles p ON p.organisation_id=v.organisation_id AND p.staff_id=? WHERE v.id=? AND v.organisation_id=? AND p.owner_id=? AND (EXISTS (SELECT 1 FROM driver_vehicle_assignments a WHERE a.organisation_id=p.organisation_id AND a.driver_profile_id=p.id AND a.vehicle_id=v.id AND a.active=1 AND a.approved=1 AND (a.valid_from='' OR a.valid_from<=date('now')) AND (a.valid_until='' OR a.valid_until>=date('now'))) OR (v.driver_profile_id=p.id AND NOT EXISTS (SELECT 1 FROM driver_vehicle_assignments a2 WHERE a2.organisation_id=p.organisation_id AND a2.driver_profile_id=p.id)))`).bind(user.userId,row.vehicle_id,user.organisationId,user.ownerId).first<AssignmentVehicleRow>();
+    if (!driver || !vehicle) return NextResponse.json({ error: 'The assigned Driver or vehicle mapping no longer exists. Ask the Admin to reassign the journey.' }, { status: 409 });
+    const reasons=[...driverOnlyEligibilityReasons(driver),...vehicleEligibilityReasons(vehicle)];
+    if(reasons.length)return NextResponse.json({error:`Journey cannot start: ${reasons.join('; ')}`,reasons},{status:409});
+    const booking=await env.DB.prepare('SELECT pickup_at FROM bookings WHERE id=? AND owner_id=?').bind(row.booking_id,user.ownerId).first<{pickup_at:string}>();
+    if(!booking)return NextResponse.json({error:'Booking not found'},{status:404});
+    const conflicts=await scheduleConflicts(user.ownerId,user.userId,row.booking_id,booking.pickup_at);
+    if(conflicts.length)return NextResponse.json({error:'Journey cannot start because you have a schedule or availability conflict',conflicts},{status:409});
+  }
   await transitionAssignment(row, user.email, transition.to, note); return NextResponse.json({ ok: true });
 }

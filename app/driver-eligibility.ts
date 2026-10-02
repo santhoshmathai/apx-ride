@@ -25,11 +25,27 @@ export type DriverEligibilityRow = {
   v5_document_status: string | null;
 };
 
+export type AssignmentVehicleRow = {
+  id: string;
+  registration: string | null;
+  vehicle_make: string | null;
+  vehicle_model: string | null;
+  vehicle_colour: string | null;
+  vehicle_category: string | null;
+  vehicle_active: number | null;
+  vehicle_approved: number | null;
+  private_hire_vehicle_licence_number: string | null;
+  private_hire_vehicle_licence_expiry: string | null;
+  mot_expiry: string | null;
+  insurance_expiry: string | null;
+  v5_document_status: string | null;
+};
+
 function validFutureDate(value: string | null, today: string) {
   return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value) && value >= today);
 }
 
-export function eligibilityReasons(row: DriverEligibilityRow, today = new Date().toISOString().slice(0, 10)) {
+export function driverOnlyEligibilityReasons(row: DriverEligibilityRow, today = new Date().toISOString().slice(0, 10)) {
   const reasons: string[] = [];
   if (!row.staff_active) reasons.push('Portal membership is disabled');
   if (!row.identity_verified) reasons.push('First Google login is incomplete');
@@ -39,7 +55,14 @@ export function eligibilityReasons(row: DriverEligibilityRow, today = new Date()
   if (!row.private_hire_licence_number || !validFutureDate(row.private_hire_licence_expiry, today)) reasons.push('Private-hire Driver licence is missing or expired');
   if (!row.dvla_licence_number || !validFutureDate(row.dvla_licence_expiry, today)) reasons.push('DVLA licence is missing or expired');
   if (row.address_evidence_status !== 'VERIFIED') reasons.push('Address evidence is not verified');
-  if (!row.vehicle_id || !row.vehicle_active) reasons.push('An active vehicle is not assigned');
+  if (!row.approved_for_assignment) reasons.push('Driver is not approved for assignment');
+  return reasons;
+}
+
+export function vehicleEligibilityReasons(row: AssignmentVehicleRow | DriverEligibilityRow, today = new Date().toISOString().slice(0, 10)) {
+  const reasons: string[] = [];
+  const id = 'id' in row ? row.id : row.vehicle_id;
+  if (!id || !row.vehicle_active) reasons.push('An active vehicle is not assigned');
   else {
     if (!row.registration) reasons.push('Vehicle registration is missing');
     if (!row.private_hire_vehicle_licence_number || !validFutureDate(row.private_hire_vehicle_licence_expiry, today)) reasons.push('Private-hire vehicle licence is missing or expired');
@@ -48,8 +71,11 @@ export function eligibilityReasons(row: DriverEligibilityRow, today = new Date()
     if (row.v5_document_status !== 'VERIFIED') reasons.push('V5 document is not verified');
     if (!row.vehicle_approved) reasons.push('Vehicle is not approved');
   }
-  if (!row.approved_for_assignment) reasons.push('Driver is not approved for assignment');
   return reasons;
+}
+
+export function eligibilityReasons(row: DriverEligibilityRow, today = new Date().toISOString().slice(0, 10)) {
+  return [...driverOnlyEligibilityReasons(row, today), ...vehicleEligibilityReasons(row, today)];
 }
 
 export const driverEligibilitySelect = `

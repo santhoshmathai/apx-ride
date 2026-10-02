@@ -117,6 +117,13 @@ export async function PATCH(req: Request) {
       paymentMethod?: string;
       accountStatus?: string;
     };
+    const existing = await env.DB.prepare('SELECT status FROM bookings WHERE id=? AND owner_id=?').bind(b.id,user.userId).first<{status:string}>();
+    if (!existing) return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+    if (b.status === 'in_progress' && existing.status !== 'in_progress') return NextResponse.json({ error: 'Confirm an eligible Driver and vehicle through the assignment workflow before starting the journey.' }, { status: 409 });
+    if (b.status === 'complete' && existing.status !== 'complete') {
+      const completed = await env.DB.prepare("SELECT id FROM booking_assignments WHERE owner_id=? AND booking_id=? AND status='COMPLETED' LIMIT 1").bind(user.userId,b.id).first();
+      if (!completed) return NextResponse.json({ error: 'Complete the auditable assignment workflow before completing the booking.' }, { status: 409 });
+    }
     await env.DB.prepare(
       'UPDATE bookings SET status=?,payment_method=COALESCE(?,payment_method),account_status=COALESCE(?,account_status),updated_at=? WHERE id=? AND owner_id=?',
     )

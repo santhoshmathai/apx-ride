@@ -5,6 +5,8 @@ export const TERMINAL_ASSIGNMENT_STATUSES = ['COMPLETED', 'DRIVER_DECLINED', 'AS
 
 export type AssignmentRow = {
   id: number; booking_id: number; driver_staff_id: string; status: string; active: number;
+  vehicle_id: string; driver_name_snapshot: string; driver_licence_snapshot: string;
+  vehicle_registration_snapshot: string; vehicle_licence_snapshot: string;
   driver_agreed_payment: number; payment_status: string; payment_date: string; payment_notes: string;
   collection_method: string; collection_status: string; collected_at: string; receipt_number: string;
 };
@@ -20,8 +22,9 @@ export async function transitionAssignment(row: AssignmentRow, actorEmail: strin
   await addAssignmentEvent(row, actorEmail, toStatus, note);
   await env.DB.prepare('UPDATE booking_assignments SET status=?,active=?,acknowledged_at=CASE WHEN ?=\'ACKNOWLEDGED\' THEN ? ELSE acknowledged_at END,assigned_at=CASE WHEN ?=\'ASSIGNED\' THEN ? ELSE assigned_at END,completed_at=CASE WHEN ?=\'COMPLETED\' THEN ? ELSE completed_at END,updated_at=? WHERE id=?')
     .bind(toStatus, terminal ? 0 : 1, toStatus, now, toStatus, now, toStatus, now, now, row.id).run();
-  if (terminal) await env.DB.prepare('UPDATE bookings SET assigned_driver_user_id=NULL,status=CASE WHEN ?=\'COMPLETED\' THEN \'complete\' WHEN ? IN (\'CUSTOMER_CANCELLED\',\'ASSIGNMENT_CANCELLED\') THEN \'cancelled\' ELSE status END,updated_at=? WHERE id=?').bind(toStatus, toStatus, now, row.booking_id).run();
-  else if (toStatus === 'ASSIGNED') await env.DB.prepare(`UPDATE bookings SET assigned_driver_user_id=?,driver_name=COALESCE((SELECT full_name FROM driver_profiles WHERE staff_id=?),''),driver_licence=COALESCE((SELECT private_hire_licence_number FROM driver_profiles WHERE staff_id=?),''),vehicle_registration=COALESCE((SELECT v.registration FROM driver_profiles p JOIN driver_vehicle_assignments a ON a.driver_profile_id=p.id AND a.active=1 AND a.approved=1 JOIN driver_vehicles v ON v.id=a.vehicle_id AND v.active=1 AND v.approved=1 WHERE p.staff_id=? ORDER BY a.primary_vehicle DESC,a.id DESC LIMIT 1),''),vehicle_licence=COALESCE((SELECT v.private_hire_vehicle_licence_number FROM driver_profiles p JOIN driver_vehicle_assignments a ON a.driver_profile_id=p.id AND a.active=1 AND a.approved=1 JOIN driver_vehicles v ON v.id=a.vehicle_id AND v.active=1 AND v.approved=1 WHERE p.staff_id=? ORDER BY a.primary_vehicle DESC,a.id DESC LIMIT 1),''),dispatched_by=?,dispatched_at=?,updated_at=? WHERE id=?`).bind(row.driver_staff_id,row.driver_staff_id,row.driver_staff_id,row.driver_staff_id,row.driver_staff_id,actorEmail,now,now,row.booking_id).run();
+  if (terminal) await env.DB.prepare("UPDATE bookings SET assigned_driver_user_id=CASE WHEN ?='COMPLETED' THEN assigned_driver_user_id ELSE NULL END,status=CASE WHEN ?='COMPLETED' THEN 'complete' WHEN ? IN ('CUSTOMER_CANCELLED','ASSIGNMENT_CANCELLED') THEN 'cancelled' ELSE status END,updated_at=? WHERE id=?").bind(toStatus, toStatus, toStatus, now, row.booking_id).run();
+  else if (toStatus === 'ASSIGNED') await env.DB.prepare("UPDATE bookings SET assigned_driver_user_id=?,driver_name=?,driver_licence=?,vehicle_registration=?,vehicle_licence=?,dispatched_by=?,dispatched_at=?,status='upcoming',updated_at=? WHERE id=?").bind(row.driver_staff_id,row.driver_name_snapshot,row.driver_licence_snapshot,row.vehicle_registration_snapshot,row.vehicle_licence_snapshot,actorEmail,now,now,row.booking_id).run();
+  else if (['EN_ROUTE','ARRIVED','PASSENGER_ONBOARD'].includes(toStatus)) await env.DB.prepare("UPDATE bookings SET assigned_driver_user_id=?,status='in_progress',updated_at=? WHERE id=?").bind(row.driver_staff_id,now,row.booking_id).run();
   else await env.DB.prepare('UPDATE bookings SET assigned_driver_user_id=?,updated_at=? WHERE id=?').bind(row.driver_staff_id, now, row.booking_id).run();
 }
 
