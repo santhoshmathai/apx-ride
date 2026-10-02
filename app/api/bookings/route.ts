@@ -59,14 +59,16 @@ export async function POST(req: Request) {
     const user = await authenticatedOwner();
     await ready();
     const b = (await req.json()) as Record<string, unknown>;
+    const hirerName = String(b.hirerName || '').trim(), passengerName = String(b.passengerName || '').trim();
+    if (!hirerName && !passengerName) return NextResponse.json({ error: 'Enter either a Hirer name or a Passenger name.' }, { status: 400 });
     const now = new Date().toISOString();
     const result = await env.DB.prepare(
       `INSERT INTO bookings(owner_id,hirer_name,passenger_name,customer_email,phone,pickup,dropoff,pickup_at,booking_received_at,responded_by,responded_at,operator,driver_call_sign,driver_name,driver_licence,booking_type,passengers,large_bags,small_bags,fleet_tier,distance,fare,base_fare,airport_fee,toll_fee,tariff,status,notes,retention_until,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     )
       .bind(
         user.userId,
-        b.hirerName || b.passengerName || 'Unnamed hirer',
-        b.passengerName || 'Unnamed passenger',
+        hirerName || passengerName,
+        passengerName || hirerName,
         b.customerEmail || '',
         b.phone || '',
         b.pickup || '',
@@ -140,12 +142,14 @@ export async function PUT(req: Request) {
     const user = await authenticatedOwner();
     await ready();
     const b = (await req.json()) as Record<string, unknown>;
+    const hirerName = String(b.hirerName || '').trim(), passengerName = String(b.passengerName || '').trim();
+    if (!hirerName && !passengerName) return NextResponse.json({ error: 'Enter either a Hirer name or a Passenger name.' }, { status: 400 });
     await env.DB.prepare(
       `UPDATE bookings SET hirer_name=?,passenger_name=?,customer_email=?,phone=?,pickup=?,dropoff=?,pickup_at=?,booking_received_at=?,operator=?,driver_call_sign=?,driver_name=?,driver_licence=?,booking_type=?,passengers=?,large_bags=?,small_bags=?,fleet_tier=?,distance=?,fare=?,notes=?,retention_until=?,updated_at=? WHERE id=? AND owner_id=?`,
     )
       .bind(
-        b.hirerName || b.passengerName || 'Unnamed hirer',
-        b.passengerName || 'Unnamed passenger',
+        hirerName || passengerName,
+        passengerName || hirerName,
         b.customerEmail || '',
         b.phone || '',
         b.pickup || '',

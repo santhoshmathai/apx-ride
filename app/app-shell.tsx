@@ -26,6 +26,7 @@ import {
   Printer,
   Save,
   Trash2,
+  Undo2,
   UsersRound,
   X,
 } from 'lucide-react';
@@ -267,7 +268,7 @@ export function AppShell({ signOutPath, account }: { signOutPath: string; accoun
               messageTemplates={messageTemplates}
             />
           )}
-          {active === 'Booking Requests' && <BookingRequests bookingSaved={() => void refresh()} />}
+          {active === 'Booking Requests' && <BookingRequests staffEmail={account.email} bookingSaved={() => void refresh()} />}
           {active === 'Calculator' && (
             <Calculator
               rates={rates}
@@ -296,6 +297,7 @@ export function AppShell({ signOutPath, account }: { signOutPath: string; accoun
         <BookingModal
           booking={modal}
           operators={operators}
+          staffEmail={account.email}
           close={() => setModal(undefined)}
           save={save}
         />
@@ -699,6 +701,7 @@ function Bookings({
   const [tab, setTab] = useState<'active' | 'progress' | 'complete' | 'cancelled'>('active');
   const [messaging, setMessaging] = useState<Booking | null>(null),
     [assigning, setAssigning] = useState<Booking | null>(null),
+    [finishing, setFinishing] = useState<Booking | null>(null),
     [from, setFrom] = useState(''),
     [to, setTo] = useState(''),
     [page, setPage] = useState(1);
@@ -719,7 +722,7 @@ function Bookings({
       title="Booking control"
       sub="Move each dispatch from scheduled to en route, then confirm payment at completion."
       action={
-        <div className="page-actions"><a className="button" href="/api/council-bookings"><Download />Council register CSV</a><button className="primary" onClick={add}><Plus />Add job</button></div>
+        <div className="page-actions"><button className="primary" onClick={add}><Plus />Add job</button></div>
       }
     >
       <div className="view-tabs">
@@ -729,7 +732,6 @@ function Bookings({
         >
           Active jobs
         </button>
-        <button className={tab === 'cancelled' ? 'active' : ''} onClick={() => setTab('cancelled')}>Cancelled ({items.filter((b) => ['cancelled','canceled','archived'].includes(b.status)).length})</button>
         <button
           className={tab === 'progress' ? 'active' : ''}
           onClick={() => setTab('progress')}
@@ -743,6 +745,7 @@ function Bookings({
         >
           Completed jobs ({items.filter((b) => b.status === 'complete').length})
         </button>
+        <button className={tab === 'cancelled' ? 'active' : ''} onClick={() => setTab('cancelled')}>Cancelled ({items.filter((b) => ['cancelled','canceled','archived'].includes(b.status)).length})</button>
       </div>
       {tab === 'complete' && <div className="completed-filter"><label>From date<input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} /></label><label>To date<input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} /></label><button onClick={() => { setFrom(''); setTo(''); setPage(1); }}>Reset</button></div>}
       {loading && <p>Loading…</p>}
@@ -766,10 +769,13 @@ function Bookings({
                 <Eye />
               </button>
               {b.status === 'complete' && <button className="invoice-action" onClick={() => printTripInvoice(b)} title="Generate trip invoice"><FileText /><span>Invoice</span></button>}
+              {b.status === 'complete' && <button className="invoice-action" onClick={() => void shareReceiptByEmail(b)} title="Prepare receipt and open email"><Mail /><span>Email receipt</span></button>}
               {b.status === 'complete' && <button className="invoice-action" onClick={() => void sendInvoice(b)} title="Email formal invoice"><Mail /><span>Email invoice</span></button>}
               {b.status !== 'complete' && <button onClick={() => edit(b)} title="Edit booking"><Pencil /></button>}
+              {b.status === 'upcoming' && <button className="invoice-action" onClick={() => setAssigning(b)} title="Assignment and Driver payment"><UsersRound /><span>Assign Driver</span></button>}
               {b.status === 'upcoming' && <button className="invoice-action" onClick={() => done(b.id, 'in_progress')} title="Mark journey en route"><Navigation /><span>En Route</span></button>}
-              {b.status !== 'complete' && <button onClick={() => setAssigning(b)} title="Assignment and Driver payment"><UsersRound /><span>Assign</span></button>}
+              {b.status === 'in_progress' && <button className="invoice-action" onClick={() => done(b.id, 'upcoming')} title="Return this journey to active jobs"><Undo2 /><span>Back to active</span></button>}
+              {b.status === 'in_progress' && <button className="invoice-action" onClick={() => setFinishing(b)} title="Finish journey and record payment"><Check /><span>Finish job</span></button>}
               {b.status !== 'complete' && <button onClick={() => setMessaging(b)} title="Message passenger"><Mail /></button>}
               {b.status !== 'complete' && <button onClick={() => remove(b.id)} title="Remove"><Trash2 /></button>}
             </div>
@@ -779,6 +785,7 @@ function Bookings({
       {tab === 'complete' && filtered.length > 10 && <div className="pager"><button disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</button><span>Showing {(page - 1) * 10 + 1}–{Math.min(page * 10, filtered.length)} of {filtered.length}</span><button disabled={page * 10 >= filtered.length} onClick={() => setPage(page + 1)}>Next</button></div>}
       {messaging && <QuickMessage booking={messaging} templates={messageTemplates} close={() => setMessaging(null)} />}
       {assigning && <AssignmentManager booking={assigning} close={() => setAssigning(null)} />}
+      {finishing && <PaymentModal booking={finishing} close={() => setFinishing(null)} confirm={(method) => { done(finishing.id, 'complete', method); setFinishing(null); }} />}
     </Page>
   );
 }
@@ -1404,17 +1411,21 @@ function ProfileList({
 function BookingModal({
   booking,
   operators,
+  staffEmail,
   close,
   save,
 }: {
   booking: Booking | null;
   operators: string[];
+  staffEmail: string;
   close: () => void;
   save: (d: Record<string, unknown>, id?: number) => void;
 }) {
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    save(Object.fromEntries(new FormData(e.currentTarget)), booking?.id);
+    const values = Object.fromEntries(new FormData(e.currentTarget));
+    if (!String(values.hirerName || '').trim() && !String(values.passengerName || '').trim()) { alert('Enter either the Hirer name or Passenger name.'); return; }
+    save(values, booking?.id);
   };
   return (
     <div className="modal">
@@ -1430,16 +1441,14 @@ function BookingModal({
           </button>
         </header>
         <div className="form-grid">
-          <label>Hirer name<input name="hirerName" defaultValue={booking?.hirer_name || booking?.passenger_name} required /></label>
+          <label>Hirer name<input name="hirerName" defaultValue={booking?.hirer_name || ''} /></label>
           <label>
             Passenger name
             <input
               name="passengerName"
               defaultValue={booking?.passenger_name}
-              required
             />
           </label>
-          <label>Booking taken date &amp; time<input name="bookingReceivedAt" type="datetime-local" defaultValue={(booking?.booking_received_at || new Date().toISOString()).slice(0,16)} required /></label>
           <label>
             Contact
             <input name="phone" defaultValue={booking?.phone} />
@@ -1546,6 +1555,7 @@ function BookingModal({
             Notes
             <textarea name="notes" rows={3} defaultValue={booking?.notes} />
           </label>
+          <label className="wide">Person who took the booking<input value={booking?.responded_by || staffEmail} readOnly /></label>
         </div>
         <footer>
           <button type="button" onClick={close}>
@@ -2094,6 +2104,12 @@ function EarningsV2({
     e.currentTarget.reset();
     refreshExpenses();
   };
+  const printStatement = () => {
+    const safe=(value:unknown)=>String(value??'').replace(/[&<>"']/g,(character)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]||character));
+    const popup=window.open('','_blank'); if(!popup){alert('Please allow pop-ups to generate the Driver statement.');return;}
+    const driverLabel=source==='ALL'?'All Drivers — Company Overview':drivers.find(([key])=>key===source)?.[1]||source;
+    popup.document.write(`<!doctype html><html><head><title>APX RIDE Driver Statement</title><style>@page{size:A4;margin:14mm}body{font:12px Arial;color:#222}h1{border-bottom:3px solid #bd9225;padding-bottom:12px}.totals{display:flex;gap:25px;margin:20px 0}.totals b{font-size:18px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #bbb;padding:7px;text-align:left}th{background:#eee}@media print{button{display:none}}</style></head><body><h1>APX RIDE — Driver Statement</h1><p><b>${safe(driverLabel)}</b><br>Generated ${safe(new Date().toLocaleString('en-GB'))}</p><div class="totals"><span>Completed jobs<br><b>${done.length}</b></span><span>Gross revenue<br><b>£${gross.toFixed(2)}</b></span><span>Expenses<br><b>£${expenseTotal.toFixed(2)}</b></span></div><table><thead><tr><th>Date</th><th>Booking</th><th>Passenger</th><th>Journey</th><th>Payment</th><th>Fare</th></tr></thead><tbody>${done.map(b=>`<tr><td>${safe(fmtDate(b.pickup_at))}</td><td>APX-${String(b.id).padStart(5,'0')}</td><td>${safe(b.passenger_name)}</td><td>${safe(b.pickup)} → ${safe(b.dropoff)}</td><td>${safe(b.payment_method||b.booking_type||'')}</td><td>£${b.fare.toFixed(2)}</td></tr>`).join('')||'<tr><td colspan="6">No completed jobs</td></tr>'}</tbody></table><button onclick="window.print()">Print / save PDF</button></body></html>`);popup.document.close();
+  };
   const del = async (id: number) => {
     await fetch('/api/expenses?id=' + id, { method: 'DELETE' });
     refreshExpenses();
@@ -2103,7 +2119,7 @@ function EarningsV2({
     <Page
       title={source === 'ALL' ? 'Company Earnings Overview' : `Driver Earnings — ${drivers.find(([key]) => key === source)?.[1] || source}`}
       sub="Revenue, collections, receivables and operating costs in one ledger."
-      action={<div className="earnings-actions"><select value={source} onChange={(e) => setSource(e.target.value)}><option value="ALL">All Drivers (Fleet Overview)</option>{drivers.map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select><button onClick={() => window.print()}><Printer />Generate Driver Statement</button></div>}
+      action={<div className="earnings-actions"><select value={source} onChange={(e) => setSource(e.target.value)}><option value="ALL">All Drivers (Fleet Overview)</option>{drivers.map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select><button onClick={printStatement}><Printer />Generate Driver Statement</button></div>}
     >
       <div className="finance-kpis">
         <FinanceCard
@@ -2527,6 +2543,23 @@ function printTripInvoice(booking: Booking) {
   const invoiceNumber = `APX-INV-${String(booking.id).padStart(5, '0')}`;
   popup.document.write(`<!doctype html><html><head><title>${invoiceNumber}</title><style>@page{size:A4;margin:18mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#222;margin:0}header{text-align:center;border-bottom:2px solid #bd9225;padding:14px 0 24px;margin-bottom:30px}header b{font-size:30px;letter-spacing:.16em}header span{display:block;margin-top:7px;font-size:11px;letter-spacing:.38em;color:#666}h1{font-size:20px;text-transform:uppercase;margin:0 0 22px}.client{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;padding:18px;border:1px solid #ddd;margin-bottom:26px}.client small,.route small{display:block;color:#666;text-transform:uppercase;font-size:10px;letter-spacing:.12em;margin-bottom:6px}.client b{font-size:15px}.route{padding:18px 0;border-top:1px solid #ddd;border-bottom:1px solid #ddd;margin-bottom:24px}.route div+div{margin-top:14px}.route b{display:block;font-size:15px}.charges{width:100%;border-collapse:collapse}.charges th,.charges td{text-align:left;padding:13px 8px;border-bottom:1px solid #ddd}.charges th:last-child,.charges td:last-child{text-align:right}.subtotal{margin-top:18px;border-top:2px solid #bd9225;border-bottom:2px solid #bd9225;padding:18px 8px;display:flex;justify-content:space-between;font-size:20px;font-weight:bold}footer{margin-top:32px;color:#666;font-size:11px}@media print{button{display:none}}</style></head><body><header><b>APX RIDE</b><span>ELEVATE EVERY MILE</span></header><h1>Trip Invoice</h1><section class="client"><div><small>Passenger Name</small><b>${safe(booking.passenger_name)}</b></div><div><small>Invoice #</small><b>${invoiceNumber}</b></div><div><small>Invoice Date</small><b>${new Date().toLocaleDateString('en-GB')}</b></div></section><section class="route"><div><small>Pickup</small><b>${safe(booking.pickup)}</b></div><div><small>Drop-off</small><b>${safe(booking.dropoff)}</b></div><div><small>Journey</small><b>${safe(fmtDate(booking.pickup_at))} · ${safe(fmtTime(booking.pickup_at))} · ${safe(booking.fleet_tier)}</b></div></section><table class="charges"><thead><tr><th>Completed journey charges</th><th>Amount</th></tr></thead><tbody>${rows.map(([label, amount]) => `<tr><td>${label}</td><td>£${amount.toFixed(2)}</td></tr>`).join('')}</tbody></table><div class="subtotal"><span>Sub Total</span><strong>£${booking.fare.toFixed(2)}</strong></div><footer>Invoice reference ${invoiceNumber} · Booking APX-${String(booking.id).padStart(5, '0')}</footer><script>window.addEventListener('load',()=>window.print())<\/script></body></html>`);
   popup.document.close();
+}
+
+async function shareReceiptByEmail(booking: Booking) {
+  const reference = `APX-RCPT-${String(booking.id).padStart(5, '0')}`;
+  const recipient = window.prompt('Confirm the passenger email address', booking.customer_email || '');
+  if (!recipient) return;
+  if (!/^\S+@\S+\.\S+$/.test(recipient)) { alert('Enter a valid email address.'); return; }
+  const text = `APX RIDE journey receipt\n\nReceipt: ${reference}\nPassenger: ${booking.passenger_name || booking.hirer_name || 'Not specified'}\nJourney: ${booking.pickup} to ${booking.dropoff}\nDate: ${new Date(booking.pickup_at).toLocaleString('en-GB')}\nAmount received: £${booking.fare.toFixed(2)}\n\nThis receipt confirms payment for the completed journey.`;
+  const file = new File([text], `${reference}.txt`, { type: 'text/plain' });
+  const shareNavigator = navigator as Navigator & { canShare?: (data: ShareData) => boolean };
+  if (navigator.share && shareNavigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ title: `APX RIDE receipt ${reference}`, text: `Send this receipt to ${recipient}`, files: [file] }); return; } catch (error) { if ((error as Error).name === 'AbortError') return; }
+  }
+  const url = URL.createObjectURL(file), link = document.createElement('a');
+  link.href = url; link.download = file.name; link.click(); URL.revokeObjectURL(url);
+  window.location.href = `mailto:${encodeURIComponent(recipient)}?subject=${encodeURIComponent(`APX RIDE journey receipt ${reference}`)}&body=${encodeURIComponent(`Hello,\n\nPlease find the APX RIDE journey receipt for booking APX-${String(booking.id).padStart(5, '0')}.\n\nThe receipt file has been downloaded; please attach it before sending.\n\nAPX RIDE`)}`;
+  alert('The receipt was downloaded and your email composer was opened. Please attach the downloaded receipt before pressing Send. Browsers cannot attach a file to an email automatically.');
 }
 
 function printCustomerDocument(input: {

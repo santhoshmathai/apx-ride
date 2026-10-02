@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, Fragment, useCallback, useEffect, useState } from 'react';
 import {
   CheckCircle2,
   Circle,
@@ -84,7 +84,12 @@ export function StaffAccessSummary({ open }: { open: () => void }) {
 export function StaffAccess({
   embedded = false,
   showCouncilStaff = true,
-}: { embedded?: boolean; showCouncilStaff?: boolean } = {}) {
+  showDriverOnboarding = true,
+}: {
+  embedded?: boolean;
+  showCouncilStaff?: boolean;
+  showDriverOnboarding?: boolean;
+} = {}) {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [editing, setEditing] = useState<StaffMember | null>(null);
   const [loading, setLoading] = useState(true);
@@ -237,54 +242,56 @@ export function StaffAccess({
         </article>
       </div>
       {showCouncilStaff && <CouncilStaffRegister />}
-      <div className="staff-grid">
-        <article className="panel staff-add-card">
-          <div className="head">
-            <small>TWO-PART ONBOARDING</small>
-            <h3>Add Driver</h3>
-          </div>
-          <form onSubmit={addDriver}>
-            <label>
-              Driver Google email
-              <input
-                name="email"
-                type="email"
-                maxLength={254}
-                placeholder="driver@example.com"
-                required
-              />
-            </label>
-            <button className="primary" disabled={saving}>
-              <UserRoundPlus />
-              {saving ? 'Saving…' : 'Add Driver'}
-            </button>
-          </form>
-          <ol className="staff-checklist">
-            <li>Portal Driver record is created here.</li>
-            <li>
-              Add the exact email manually to the Cloudflare Access policy.
-            </li>
-            <li>Driver completes their first Google login.</li>
-            <li>Complete and verify Driver and vehicle compliance.</li>
-            <li>Approve the Driver for assignment.</li>
-          </ol>
-        </article>
-        <article className="panel staff-security-note">
-          <CircleAlert />
-          <div>
-            <h3>Two controls are required</h3>
-            <p>
-              Cloudflare authenticates the named person. The portal assigns
-              their role. An email in Cloudflare alone receives no portal role;
-              a portal record alone cannot pass Cloudflare.
-            </p>
-            <p>
-              Owner/Admin can have a separate Driver profile while retaining all
-              Admin permissions.
-            </p>
-          </div>
-        </article>
-      </div>
+      {showDriverOnboarding && (
+        <div className="staff-grid">
+          <article className="panel staff-add-card">
+            <div className="head">
+              <small>TWO-PART ONBOARDING</small>
+              <h3>Add Driver</h3>
+            </div>
+            <form onSubmit={addDriver}>
+              <label>
+                Driver Google email
+                <input
+                  name="email"
+                  type="email"
+                  maxLength={254}
+                  placeholder="driver@example.com"
+                  required
+                />
+              </label>
+              <button className="primary" disabled={saving}>
+                <UserRoundPlus />
+                {saving ? 'Saving…' : 'Add Driver'}
+              </button>
+            </form>
+            <ol className="staff-checklist">
+              <li>Portal Driver record is created here.</li>
+              <li>
+                Add the exact email manually to the Cloudflare Access policy.
+              </li>
+              <li>Driver completes their first Google login.</li>
+              <li>Complete and verify Driver and vehicle compliance.</li>
+              <li>Approve the Driver for assignment.</li>
+            </ol>
+          </article>
+          <article className="panel staff-security-note">
+            <CircleAlert />
+            <div>
+              <h3>Two controls are required</h3>
+              <p>
+                Cloudflare authenticates the named person. The portal assigns
+                their role. An email in Cloudflare alone receives no portal
+                role; a portal record alone cannot pass Cloudflare.
+              </p>
+              <p>
+                Owner/Admin can have a separate Driver profile while retaining
+                all Admin permissions.
+              </p>
+            </div>
+          </article>
+        </div>
+      )}
       {error && (
         <p className="staff-message error" role="alert">
           {error}
@@ -305,8 +312,10 @@ export function StaffAccess({
           <p>Loading staff…</p>
         ) : (
           <div className="staff-list">
-            {staff.map((member) => (
-              <div className="staff-row" key={member.id}>
+            {[...staff].sort((a,b)=>a.role.localeCompare(b.role)).map((member,index,list) => (
+              <Fragment key={member.id}>
+              {(index===0||list[index-1].role!==member.role)&&<h4 className="staff-category-title">{member.role==='OWNER_ADMIN'?'Staff access':'Driver access'}</h4>}
+              <div className="staff-row">
                 <div>
                   <strong>{member.email}</strong>
                   <span>
@@ -380,7 +389,7 @@ export function StaffAccess({
                       </button>
                     )}
                 </div>
-              </div>
+              </div></Fragment>
             ))}
           </div>
         )}
@@ -429,7 +438,11 @@ export function DriverProfileEditor({
       unknown
     >;
     payload.staffId = member.id;
-    for (const name of ['profileActive', 'approvedForAssignment'])
+    for (const name of [
+      'profileActive',
+      'approvedForAssignment',
+      'medicalExemption',
+    ])
       payload[name] = data.get(name) === 'on';
     const response = await fetch('/api/driver-profiles', {
       method: 'PUT',
@@ -609,6 +622,11 @@ export function DriverProfileEditor({
             </select>
           </label>
           <Check
+            name="medicalExemption"
+            label="Council medical exemption certificate held"
+            checked={Boolean(profile?.medical_exemption)}
+          />
+          <Check
             name="profileActive"
             label="Profile activation"
             checked={profile ? Boolean(profile.profile_active) : true}
@@ -750,7 +768,7 @@ export function ProfileDocuments({
   entityId,
   label,
 }: {
-  entityType: 'DRIVER' | 'VEHICLE';
+  entityType: 'DRIVER' | 'VEHICLE' | 'STAFF';
   entityId: string;
   label: string;
 }) {
@@ -835,7 +853,13 @@ export function ProfileDocuments({
         {items.map((item) => (
           <article key={item.id}>
             <span>
-              <b>{item.file_name}</b>
+              <a
+                href={`/api/profile-documents?id=${item.id}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <b>{item.file_name}</b>
+              </a>
               <small>
                 {item.field_name} ·{' '}
                 {new Date(item.uploaded_at).toLocaleDateString('en-GB')}
@@ -983,6 +1007,24 @@ function CouncilStaffModal({
     }
     saved();
   }
+  async function removeStaff() {
+    if (
+      !row ||
+      !confirm(
+        `Delete the retained staff entry for ${row.full_name}? The server will allow this only after the required retention period.`,
+      )
+    )
+      return;
+    const response = await fetch(`/api/council-staff?id=${row.id}`, {
+      method: 'DELETE',
+    });
+    const result = (await response.json()) as { error?: string };
+    if (!response.ok) {
+      setError(result.error || 'Could not delete staff entry');
+      return;
+    }
+    saved();
+  }
   return (
     <div className="modal">
       <button className="scrim" onClick={close} />
@@ -1105,7 +1147,24 @@ function CouncilStaffModal({
           Record only that the original DBS certificate was seen, when it was
           seen and by whom. Do not upload, scan or retain the certificate here.
         </p>
+        {row && (
+          <ProfileDocuments
+            entityType="STAFF"
+            entityId={String(row.id)}
+            label="Staff documents"
+          />
+        )}
         <footer>
+          {row && (
+            <button
+              type="button"
+              className="danger"
+              onClick={() => void removeStaff()}
+            >
+              <Trash2 />
+              Delete staff entry
+            </button>
+          )}
           <button type="button" onClick={close}>
             Cancel
           </button>

@@ -64,3 +64,22 @@ export async function PUT(req: Request) {
     .bind(user.userId, user.email, 'UPDATE', String(existing.record_type), String(body.id), `Updated ${String(body.reference || existing.reference)}`, now).run();
   return NextResponse.json({ ok: true });
 }
+
+export async function DELETE(req: Request) {
+  if (!validMutationOrigin(req)) return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 });
+  const user = await authorised();
+  if (!user) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  const id = Number(new URL(req.url).searchParams.get('id'));
+  const row = await env.DB.prepare('SELECT id,record_type,reference,retention_until FROM compliance_records WHERE id=? AND owner_id=?').bind(id,user.userId).first<{id:number;record_type:string;reference:string;retention_until:string}>();
+  if (!row) return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+  if (!row.retention_until || row.retention_until > new Date().toISOString().slice(0,10)) return NextResponse.json({ error: `This record must be retained until ${row.retention_until || 'its retention date'}.` }, { status: 409 });
+  const documents = await env.DB.prepare('SELECT object_key FROM compliance_documents WHERE owner_id=? AND record_id=?').bind(user.userId,id).all<{object_key:string}>();
+  for (const document of documents.results) await env.BUCKET.delete(document.object_key);
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM compliance_documents WHERE owner_id=? AND record_id=?').bind(user.userId,id),
+    env.DB.prepare('DELETE FROM record_revisions WHERE owner_id=? AND record_id=?').bind(user.userId,id),
+    env.DB.prepare('DELETE FROM compliance_records WHERE owner_id=? AND id=?').bind(user.userId,id),
+    env.DB.prepare('INSERT INTO audit_events(owner_id,actor_email,action,entity_type,entity_id,summary,created_at) VALUES(?,?,?,?,?,?,?)').bind(user.userId,user.email,'DELETE_AFTER_RETENTION',row.record_type,String(id),`Deleted ${row.reference} after retention period`,new Date().toISOString()),
+  ]);
+  return NextResponse.json({ ok: true });
+}
