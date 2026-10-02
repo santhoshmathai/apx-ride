@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "apx-ride-portal-staging",
+  "main": "dist/server/index.js",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "portal-staging.apxride.com", "custom_domain": true }],
+  "assets": { "directory": "dist/client" },
+  "vars": {
+    "APX_AUTH_MODE": "cloudflare",
+    "CF_ACCESS_TEAM_DOMAIN": "apxride-portal.cloudflareaccess.com",
+    "CF_ACCESS_AUD": "181dd9cad29cea775fe99891906e45fa8e5f10b8d93abd52e70c08fd8de23fc7"
+  },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "apx-ride-staging",
+    "database_id": "06ebd43e-b555-4a7b-b763-e4f3a07412ba",
+    "migrations_dir": "drizzle"
+  }],
+  "r2_buckets": [{
+    "binding": "BUCKET",
+    "bucket_name": "apx-ride-staging-documents",
+    "jurisdiction": "eu"
+  }]
+}
