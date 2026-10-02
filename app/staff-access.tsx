@@ -410,6 +410,12 @@ export function DriverProfileEditor({
   const [profile, setProfile] = useState<DriverProfile | null>(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [verification, setVerification] = useState({
+    addressEvidenceStatus: 'MISSING',
+    dbsStatus: 'MISSING',
+    rightToWorkStatus: 'MISSING',
+    visaStatus: 'NOT_REQUIRED',
+  });
   useEffect(() => {
     void fetch(`/api/driver-profiles?staffId=${encodeURIComponent(member.id)}`)
       .then(async (response) => {
@@ -419,6 +425,12 @@ export function DriverProfileEditor({
         if (!response.ok)
           throw new Error(value.error || 'Could not load Driver profile');
         setProfile(value);
+        setVerification({
+          addressEvidenceStatus: String(value.address_evidence_status || 'MISSING'),
+          dbsStatus: String(value.dbs_status || 'MISSING'),
+          rightToWorkStatus: String(value.right_to_work_status || 'MISSING'),
+          visaStatus: String(value.visa_status || 'NOT_REQUIRED'),
+        });
       })
       .catch((reason) =>
         setError(
@@ -598,23 +610,27 @@ export function DriverProfileEditor({
           <SelectStatus
             name="addressEvidenceStatus"
             label="Address evidence"
-            value={value('address_evidence_status')}
+            value={verification.addressEvidenceStatus}
+            onChange={(next) => setVerification((current) => ({ ...current, addressEvidenceStatus: next }))}
           />
           <SelectStatus
             name="dbsStatus"
             label="DBS certificate"
-            value={value('dbs_status')}
+            value={verification.dbsStatus}
+            onChange={(next) => setVerification((current) => ({ ...current, dbsStatus: next }))}
           />
           <SelectStatus
             name="rightToWorkStatus"
             label="Right to Work"
-            value={value('right_to_work_status')}
+            value={verification.rightToWorkStatus}
+            onChange={(next) => setVerification((current) => ({ ...current, rightToWorkStatus: next }))}
           />
           <label>
             Visa / E-Visa
             <select
               name="visaStatus"
-              defaultValue={value('visa_status') || 'NOT_REQUIRED'}
+              value={verification.visaStatus}
+              onChange={(event) => setVerification((current) => ({ ...current, visaStatus: event.target.value }))}
             >
               <option value="NOT_REQUIRED">Not required</option>
               <option value="VERIFIED">Verified</option>
@@ -723,15 +739,17 @@ function SelectStatus({
   name,
   label,
   value,
+  onChange,
 }: {
   name: string;
   label: string;
   value: string;
+  onChange: (value: string) => void;
 }) {
   return (
     <label>
       {label}
-      <select name={name} defaultValue={value || 'MISSING'}>
+      <select name={name} value={value || 'MISSING'} onChange={(event) => onChange(event.target.value)}>
         <option value="MISSING">Missing / not verified</option>
         <option value="VERIFIED">Verified</option>
       </select>
