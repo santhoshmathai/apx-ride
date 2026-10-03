@@ -1,0 +1,16 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "apx-ride-public-api-production",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "api.apxride.com", "custom_domain": true }],
+  "services": [{ "binding": "PORTAL", "service": "apx-ride-portal-production" }],
+  "ratelimits": [{ "name": "BOOKING_LIMITER", "namespace_id": "2402", "simple": { "limit": 5, "period": 60 } }],
+  "vars": {
+    "EXPECTED_HOSTNAME": "apxride.com",
+    "ENVIRONMENT": "production",
+    "PORTAL_HOSTNAME": "portal-production.apxride.com"
+  }
+}

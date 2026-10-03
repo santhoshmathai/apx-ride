@@ -11,6 +11,7 @@
   "vars": {
     "TURNSTILE_SECRET": "1x0000000000000000000000000000000AA",
     "EXPECTED_HOSTNAME": "apxride.com",
-    "ENVIRONMENT": "staging"
+    "ENVIRONMENT": "staging",
+    "PORTAL_HOSTNAME": "portal-staging.apxride.com"
   }
 }

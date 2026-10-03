@@ -1,4 +1,4 @@
-interface Env { PORTAL: Fetcher; BOOKING_LIMITER: RateLimit; TURNSTILE_SECRET: string; EXPECTED_HOSTNAME: string; ENVIRONMENT: string }
+interface Env { PORTAL: Fetcher; BOOKING_LIMITER: RateLimit; TURNSTILE_SECRET: string; EXPECTED_HOSTNAME: string; ENVIRONMENT: string; PORTAL_HOSTNAME?: string }
 const origins=new Set(['https://apxride.com','https://www.apxride.com','https://apx-ride.hellosanthoshmathai.chatgpt.site']);
 const cors=(origin:string)=>({'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'content-type','access-control-max-age':'86400','vary':'Origin','cache-control':'no-store','x-content-type-options':'nosniff'});
 const json=(origin:string,body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors(origin),'content-type':'application/json'}});
@@ -19,6 +19,7 @@ export default { async fetch(request:Request,env:Env):Promise<Response>{
   if(!checked.ok||!result.success)return json(origin,{error:'Security verification failed. Please refresh and try again.'},400);
   if(env.ENVIRONMENT!=='staging'&&result.hostname&&![env.EXPECTED_HOSTNAME,`www.${env.EXPECTED_HOSTNAME}`].includes(result.hostname))return json(origin,{error:'Security verification hostname mismatch'},400);
   delete body.turnstileToken;
-  const upstream=new Request('https://portal-staging.apxride.com/api/public-booking-requests',{method:'POST',headers:{'content-type':'application/json','origin':origin,'x-apx-public-gateway':'staging'},body:JSON.stringify(body)});
+  const portalHostname=env.PORTAL_HOSTNAME||'portal-staging.apxride.com';
+  const upstream=new Request(`https://${portalHostname}/api/public-booking-requests`,{method:'POST',headers:{'content-type':'application/json','origin':origin,'x-apx-public-gateway':env.ENVIRONMENT},body:JSON.stringify(body)});
   const response=await env.PORTAL.fetch(upstream); const headers=new Headers(response.headers); Object.entries(cors(origin)).forEach(([key,value])=>headers.set(key,value)); return new Response(response.body,{status:response.status,headers});
 } } satisfies ExportedHandler<Env>;
