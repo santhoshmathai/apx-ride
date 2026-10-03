@@ -685,6 +685,19 @@ function AuditHistory() {
   );
 }
 function CouncilExports() {
+  const downloadBookingRegister = async () => {
+    const response = await fetch('/api/council-bookings?format=csv');
+    if (!response.ok) {
+      const result = (await response.json().catch(() => ({}))) as { error?: string };
+      alert(result.error || 'The booking and dispatch register could not be generated.');
+      return;
+    }
+    download(
+      await response.text(),
+      `apx-ride-council-booking-register-${new Date().toISOString().slice(0, 10)}.csv`,
+      'text/csv;charset=utf-8',
+    );
+  };
   const print = async () => {
     const types = [
       'lost_property',
@@ -735,15 +748,15 @@ function CouncilExports() {
         </div>
       </header>
       <div className="records-overview-grid">
-        <a
+        <button
           className="panel export-card"
-          href="/api/council-bookings?format=csv"
+          onClick={() => void downloadBookingRegister()}
         >
           <strong>Booking and dispatch register</strong>
           <span>
             Bookings, hirer, Driver, vehicle and dispatch attribution.
           </span>
-        </a>
+        </button>
         <a className="panel export-card" href="/api/council-staff?format=csv">
           <strong>Booking &amp; dispatch staff register</strong>
           <span>Roles, DBS sighting and suitability decisions.</span>

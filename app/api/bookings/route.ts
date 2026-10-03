@@ -43,18 +43,33 @@ export async function GET() {
     const user = await authenticatedOwner();
     await ready();
     const data = await env.DB.prepare(
-      `SELECT b.*,a.id AS active_assignment_id,a.status AS assignment_status
+      `SELECT b.*,a.id AS active_assignment_id,a.status AS assignment_status,
+         latest.driver_name_snapshot AS assignment_driver_name,
+         latest.driver_licence_snapshot AS assignment_driver_licence,
+         latest.vehicle_registration_snapshot AS assignment_vehicle_registration,
+         latest.vehicle_licence_snapshot AS assignment_vehicle_licence
        FROM bookings b
        LEFT JOIN booking_assignments a ON a.id=(
          SELECT ba.id FROM booking_assignments ba
          WHERE ba.owner_id=b.owner_id AND ba.booking_id=b.id AND ba.active=1
          ORDER BY ba.id DESC LIMIT 1
        )
+       LEFT JOIN booking_assignments latest ON latest.id=(
+         SELECT history.id FROM booking_assignments history
+         WHERE history.owner_id=b.owner_id AND history.booking_id=b.id
+         ORDER BY history.id DESC LIMIT 1
+       )
        WHERE b.owner_id=? ORDER BY b.pickup_at DESC`,
     )
       .bind(user.userId)
       .all();
-    return NextResponse.json(data.results);
+    return NextResponse.json((data.results as Record<string, unknown>[]).map((row) => ({
+      ...row,
+      driver_name: row.assignment_driver_name || row.driver_name || '',
+      driver_licence: row.assignment_driver_licence || row.driver_licence || '',
+      vehicle_registration: row.assignment_vehicle_registration || row.vehicle_registration || '',
+      vehicle_licence: row.assignment_vehicle_licence || row.vehicle_licence || '',
+    })));
   } catch (error) {
     return authError(error);
   }
@@ -163,7 +178,7 @@ export async function PUT(req: Request) {
     const respondedBy = typeof b.respondedBy === 'string' && b.respondedBy.trim() ? b.respondedBy.trim().slice(0,254) : user.email;
     const bookingReceivedAt = typeof b.bookingReceivedAt === 'string' && b.bookingReceivedAt ? b.bookingReceivedAt : new Date().toISOString();
     await env.DB.prepare(
-      `UPDATE bookings SET hirer_name=?,passenger_name=?,customer_email=?,phone=?,pickup=?,dropoff=?,pickup_at=?,booking_received_at=?,responded_by=?,operator=?,driver_call_sign=?,driver_name=?,driver_licence=?,booking_type=?,passengers=?,large_bags=?,small_bags=?,fleet_tier=?,distance=?,fare=?,notes=?,retention_until=?,updated_at=? WHERE id=? AND owner_id=?`,
+      `UPDATE bookings SET hirer_name=?,passenger_name=?,customer_email=?,phone=?,pickup=?,dropoff=?,pickup_at=?,booking_received_at=?,responded_by=?,operator=?,booking_type=?,passengers=?,large_bags=?,small_bags=?,fleet_tier=?,distance=?,fare=?,notes=?,retention_until=?,updated_at=? WHERE id=? AND owner_id=?`,
     )
       .bind(
         hirerName || passengerName,
@@ -176,9 +191,6 @@ export async function PUT(req: Request) {
         bookingReceivedAt,
         respondedBy,
         b.operator || 'APX RIDE',
-        b.driverCallSign || '',
-        b.driverName || '',
-        b.driverLicence || '',
         b.bookingType || 'CASH',
         b.passengers || 1,
         b.largeBags || 0,
