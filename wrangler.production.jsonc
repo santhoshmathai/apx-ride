@@ -10,7 +10,8 @@
   "assets": { "directory": "dist/client" },
   "vars": {
     "APX_AUTH_MODE": "cloudflare",
-    "CF_ACCESS_TEAM_DOMAIN": "apxride-portal.cloudflareaccess.com"
+    "CF_ACCESS_TEAM_DOMAIN": "apxride-portal.cloudflareaccess.com",
+    "CF_ACCESS_AUD": "131af8d9a6fadcf55717332baed8310015c37ad9a0e403d91fb28f1de5dc025f"
   },
   "d1_databases": [{
     "binding": "DB",
