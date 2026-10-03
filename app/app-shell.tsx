@@ -69,6 +69,8 @@ type Booking = {
   driver_licence?: string;
   vehicle_registration?: string;
   vehicle_licence?: string;
+  active_assignment_id?: number;
+  assignment_status?: string;
   retention_until?: string;
 };
 type Rate = { base: number; rate: number };
@@ -709,6 +711,7 @@ function Bookings({
     [to, setTo] = useState(''),
     [page, setPage] = useState(1);
   const [startRequested, setStartRequested] = useState(false);
+  const [actioning, setActioning] = useState<number | null>(null);
   const filtered = items.filter((b) =>
     tab === 'complete'
       ? b.status === 'complete'
@@ -721,6 +724,16 @@ function Bookings({
     .sort((a, b) => a.pickup_at.localeCompare(b.pickup_at));
   const shown = tab === 'complete' ? filtered.slice((page - 1) * 10, page * 10) : filtered;
   const sendInvoice = async (booking: Booking) => { if (!confirm(`Send formal invoice to ${booking.customer_email || 'the customer email on this booking'}?`)) return; const response=await fetch('/api/invoices',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bookingId:booking.id})}); const value=await response.json() as {error?:string;status?:string}; if(!response.ok&&response.status!==202){alert(value.error||'Invoice could not be sent');return;} alert(`Invoice ${value.status==='SENT'?'sent':'queued for delivery'}.`); };
+  const journeyAction = async (booking: Booking, action: 'START_JOURNEY'|'BACK_TO_ACTIVE'|'ADMIN_NEXT') => {
+    if (!booking.active_assignment_id) { setStartRequested(true); setAssigning(booking); return; }
+    if (action==='ADMIN_NEXT'&&booking.assignment_status==='PASSENGER_ONBOARD'&&!confirm('Complete this journey? This records the assignment as completed.')) return;
+    setActioning(booking.id);
+    const response=await fetch('/api/assignments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bookingId:booking.id,assignmentId:booking.active_assignment_id,action})});
+    const value=await response.json() as {error?:string;conflicts?:string[]};
+    setActioning(null);
+    if(!response.ok){alert([value.error,...(value.conflicts||[])].filter(Boolean).join('\n'));return;}
+    await changed();
+  };
   return (
     <Page
       title="Booking control"
@@ -764,6 +777,7 @@ function Bookings({
               <h3>{b.pickup} <span>→</span> {b.dropoff}</h3>
               <p>{b.passenger_name} · {b.fleet_tier} · {b.booking_type || 'CASH'}</p>
               {b.driver_name ? <p className="booking-assignment-summary"><b>Driver:</b> {b.driver_name}{b.driver_licence ? ` · ${b.driver_licence}` : ''} <b>Vehicle:</b> {b.vehicle_registration || 'Not recorded'}{b.vehicle_licence ? ` · ${b.vehicle_licence}` : ''}</p> : b.status === 'upcoming' ? <p className="booking-assignment-warning">Driver and vehicle not assigned</p> : null}
+              {b.assignment_status && <p className="booking-journey-state"><b>{b.assignment_status.replaceAll('_',' ')}</b></p>}
             </div>
             <div className="record-fare">
               <b>£{b.fare.toFixed(2)}</b>
@@ -778,8 +792,13 @@ function Bookings({
               {b.status === 'complete' && <button className="invoice-action" onClick={() => void sendInvoice(b)} title="Email formal invoice"><Mail /><span>Email invoice</span></button>}
               {b.status !== 'complete' && <button onClick={() => edit(b)} title="Edit booking"><Pencil /></button>}
               {['upcoming','in_progress'].includes(b.status) && <button onClick={() => { setStartRequested(false); setAssigning(b); }} title="Assign Driver / manage assignment" aria-label="Assign Driver / manage assignment"><UsersRound /></button>}
-              {b.status === 'upcoming' && <button className="invoice-action" onClick={() => { setStartRequested(true); setAssigning(b); }} title="Confirm Driver and vehicle before starting"><Navigation /><span>En Route</span></button>}
-              {b.status === 'in_progress' && <button className="invoice-action" onClick={() => { setStartRequested(false); setAssigning(b); }} title="Manage journey status or return it to active"><Undo2 /><span>Journey status</span></button>}
+              {b.status === 'upcoming' && b.assignment_status==='ASSIGNED' && <button className="invoice-action journey-primary" disabled={actioning===b.id} onClick={() => void journeyAction(b,'START_JOURNEY')} title="Revalidate Driver and vehicle and start journey"><Navigation /><span>{actioning===b.id?'Updating…':'En Route'}</span></button>}
+              {b.status === 'upcoming' && b.assignment_status!=='ASSIGNED' && <button className="invoice-action journey-primary" onClick={() => { setStartRequested(true); setAssigning(b); }} title="Assign Driver and vehicle before starting"><Navigation /><span>Assign &amp; start</span></button>}
+              {b.status === 'in_progress' && b.assignment_status==='EN_ROUTE' && <button className="invoice-action journey-primary" disabled={actioning===b.id} onClick={() => void journeyAction(b,'ADMIN_NEXT')} title="Mark Driver arrived"><Check /><span>Mark Arrived</span></button>}
+              {b.status === 'in_progress' && b.assignment_status==='EN_ROUTE' && <button className="invoice-action" disabled={actioning===b.id} onClick={() => void journeyAction(b,'BACK_TO_ACTIVE')} title="Return journey to active"><Undo2 /><span>Back to Active</span></button>}
+              {b.status === 'in_progress' && b.assignment_status==='ARRIVED' && <button className="invoice-action journey-primary" disabled={actioning===b.id} onClick={() => void journeyAction(b,'ADMIN_NEXT')} title="Record passenger onboard"><Check /><span>Passenger Onboard</span></button>}
+              {b.status === 'in_progress' && b.assignment_status==='PASSENGER_ONBOARD' && <button className="invoice-action journey-primary" disabled={actioning===b.id} onClick={() => void journeyAction(b,'ADMIN_NEXT')} title="Complete journey"><Check /><span>Complete Journey</span></button>}
+              {b.status === 'in_progress' && <button className="invoice-action" onClick={() => { setStartRequested(false); setAssigning(b); }} title="Open assignment details and audit history"><UsersRound /><span>Details</span></button>}
               {b.status !== 'complete' && <button onClick={() => setMessaging(b)} title="Message passenger"><Mail /></button>}
               {b.status !== 'complete' && <button onClick={() => remove(b.id)} title="Remove"><Trash2 /></button>}
             </div>
@@ -808,7 +827,7 @@ function AssignmentManager({ booking, startRequested, close, changed }: { bookin
   const selectedDriver=drivers.find((driver)=>driver.id===selectedDriverId); const vehicles=selectedDriver?.vehicles||[];
   useEffect(()=>{if(!drivers.length||selectedDriverId)return;const preferred=(startRequested?drivers.find((driver)=>driver.is_current_user&&driver.eligible&&!driver.conflicts.length):undefined)||drivers.find((driver)=>driver.eligible&&!driver.conflicts.length);if(preferred){setSelectedDriverId(preferred.id);setSelectedVehicleId(preferred.vehicles.find((item)=>item.eligible)?.id||'');}},[drivers,startRequested,selectedDriverId]);
   useEffect(()=>{if(!selectedDriver)return;if(!selectedDriver.vehicles.some((item)=>item.id===selectedVehicleId&&item.eligible))setSelectedVehicleId(selectedDriver.vehicles.find((item)=>item.eligible)?.id||'');},[selectedDriver,selectedVehicleId]);
-  return <div className="modal"><button className="scrim" onClick={close}/><section className="record-modal assignment-modal"><header><div><small>AUDITABLE ASSIGNMENT</small><h2>APX-{String(booking.id).padStart(5,'0')}</h2><p>Customer fare £{booking.fare.toFixed(2)} · Driver payment is managed separately</p></div><button onClick={close}><X/></button></header>{error&&<p className="staff-message error">{error}</p>}
+  return <div className="modal assignment-workflow"><button className="scrim" onClick={close}/><section className="record-modal assignment-modal"><header><div><small>AUDITABLE ASSIGNMENT</small><h2>APX-{String(booking.id).padStart(5,'0')}</h2><p>Customer fare £{booking.fare.toFixed(2)} · Driver payment is managed separately</p></div><button onClick={close} aria-label="Close assignment"><X/></button></header>{error&&<p className="staff-message error">{error}</p>}
     {startRequested&&!current&&<p className="staff-message">Select and confirm the Driver and exact vehicle before this journey can start.</p>}
     {!current&&<form className="assignment-offer" onSubmit={offer}><label>Eligible Driver<select name="driverId" required value={selectedDriverId} onChange={(event)=>setSelectedDriverId(event.target.value)}><option value="" disabled>Select Driver</option>{drivers.map((driver)=><option key={driver.id} value={driver.id} disabled={!driver.eligible||driver.conflicts.length>0}>{driver.full_name||driver.email}{driver.is_current_user?' — You':''}{!driver.eligible?' — compliance blocked':driver.conflicts.length?' — schedule conflict':''}</option>)}</select></label><label>Exact vehicle<select name="vehicleId" required value={selectedVehicleId} onChange={(event)=>setSelectedVehicleId(event.target.value)}><option value="" disabled>Select vehicle</option>{vehicles.map((vehicle)=><option key={vehicle.id} value={vehicle.id} disabled={!vehicle.eligible}>{vehicle.registration} · {[vehicle.vehicle_make,vehicle.vehicle_model,vehicle.vehicle_colour].filter(Boolean).join(' ')}{!vehicle.eligible?' — compliance blocked':''}</option>)}</select></label><label>Driver agreed payment (£)<input name="agreedPayment" type="number" min="0" step="0.01" defaultValue="0" required/></label><label className="wide">Assignment note<textarea name="note" rows={2}/></label>{selectedDriver&&selectedVehicleId&&<div className="wide assignment-confirmation"><b>{selectedDriver.full_name||selectedDriver.email}</b><span>PHD licence {selectedDriver.private_hire_licence_number||'missing'} · valid to {selectedDriver.private_hire_licence_expiry||'missing'}</span><span>Vehicle {vehicles.find((item)=>item.id===selectedVehicleId)?.registration} · PHV licence {vehicles.find((item)=>item.id===selectedVehicleId)?.private_hire_vehicle_licence_number||'missing'}</span></div>}<button className="primary" disabled={saving||!selectedDriverId||!selectedVehicleId}>{selectedDriver?.is_current_user?(startRequested?'Confirm assignment and start journey':'Assign to myself'):'Offer to Driver'}</button>{drivers.length===0&&<p className="staff-message error wide">No Driver memberships exist. Add a Driver in Operations first.</p>}{drivers.length>0&&!drivers.some((driver)=>driver.eligible&&driver.conflicts.length===0)&&<p className="staff-message error wide">No Driver and vehicle combination is currently eligible. Open Operations to review the compliance blocks.</p>}</form>}
     <div className="assignment-driver-status">{drivers.map((driver)=><details key={driver.id}><summary>{driver.full_name||driver.email} · {driver.eligible?'Compliance eligible':'Not eligible'}{driver.conflicts.length?` · ${driver.conflicts.length} conflict(s)`:''}</summary>{driver.eligibility_reasons.length>0&&<ul>{driver.eligibility_reasons.map((reason)=><li key={reason}>{reason}</li>)}</ul>}{driver.vehicles.map((vehicle)=><div key={vehicle.id}><b>{vehicle.registration}</b>{vehicle.eligibility_reasons.length?<ul>{vehicle.eligibility_reasons.map((reason)=><li key={reason}>{reason}</li>)}</ul>:<span> · eligible</span>}</div>)}{driver.conflicts.length>0&&<ul>{driver.conflicts.map((conflict)=><li key={conflict}>{conflict}</li>)}</ul>}</details>)}</div>

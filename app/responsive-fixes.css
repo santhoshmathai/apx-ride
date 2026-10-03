@@ -117,6 +117,9 @@
 .booking-assignment-summary,.booking-assignment-warning { margin-top: 5px !important; font-size: .76rem !important; }
 .booking-assignment-summary b { color: #d9ae43; margin-left: 8px; }.booking-assignment-summary b:first-child { margin-left: 0; }
 .booking-assignment-warning { color: #e8b94b !important; }
+.booking-journey-state { margin-top: 7px !important; }.booking-journey-state b { display: inline-block; padding: 4px 8px; border: 1px solid #7f6722; border-radius: 999px; color: #e5bd4c; font-size: .65rem; letter-spacing: .06em; }
+.record-actions .journey-primary { border-color: #a47d18; background: #d8aa2d; color: #111; }
+.record-actions button:disabled { cursor: wait; opacity: .6; }
 .assignment-driver-status { display: grid; gap: 7px; margin: 15px 0; }.assignment-driver-status details { padding: 10px 12px; border: 1px solid #303337; border-radius: 8px; color: #aaa; font-size: .72rem; }.assignment-driver-status summary { cursor: pointer; color: #ddd; }.assignment-driver-status ul { margin-bottom: 0; }
 .assignment-history { display: grid; gap: 8px; }.assignment-history article { display: grid; grid-template-columns: minmax(180px,1fr) auto auto auto; align-items: center; gap: 10px; padding: 12px; border: 1px solid #303337; border-radius: 8px; }.assignment-history article > div { display: grid; gap: 3px; }.assignment-history span { color: #929598; font-size: .68rem; }.assignment-history strong { color: #e4bd55; font-size: .68rem; }.assignment-history button { padding: 7px; border: 1px solid #55491f; border-radius: 6px; background: #1d1a11; color: #e4bd55; font-size: .65rem; }
 .assignment-timeline { display: grid; gap: 0; }.assignment-timeline > div { display: grid; grid-template-columns: 145px 190px 1fr; gap: 10px; padding: 9px 0; border-bottom: 1px solid #292c2f; font-size: .68rem; }.assignment-timeline time,.assignment-timeline span { color: #929598; }.assignment-timeline b { color: #d9b54e; }
@@ -356,6 +359,22 @@
   .driver-table > div { grid-template-columns: 1fr auto; }.driver-table em { grid-column: 1 / -1; }
   .driver-calendar { grid-template-columns: repeat(7,minmax(105px,1fr)); }
   .assignment-offer { grid-template-columns: 1fr; }.assignment-offer .wide { grid-column: auto; }.assignment-history article,.assignment-timeline > div { grid-template-columns: 1fr; }
+  .assignment-workflow { align-items: stretch; justify-items: stretch; }
+  .assignment-workflow .scrim { display: none; }
+  .assignment-workflow .assignment-modal { width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border: 0; border-radius: 0; padding: 0 16px max(22px,env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  .assignment-workflow .assignment-modal > header { position: sticky; top: 0; z-index: 5; margin: 0 -16px 12px; padding: 14px 16px; background: #17191bf2; border-bottom: 1px solid #34373a; backdrop-filter: blur(12px); }
+  .assignment-workflow .assignment-modal > header h2 { margin: 3px 0 2px; font-size: 1.25rem; }
+  .assignment-workflow .assignment-modal > header p { margin: 2px 0; font-size: .68rem; }
+  .assignment-workflow .assignment-modal > header > button { display: grid; place-items: center; min-width: 44px; width: 44px; height: 44px; border: 1px solid #3b3e41; border-radius: 10px; background: #111315; }
+  .assignment-workflow .assignment-offer { grid-template-columns: 1fr; gap: 14px; }
+  .assignment-workflow .assignment-offer .wide { grid-column: auto; }
+  .assignment-workflow .assignment-offer input,.assignment-workflow .assignment-offer select,.assignment-workflow .assignment-offer textarea { min-height: 48px; font-size: 16px; }
+  .assignment-workflow .assignment-offer > .primary { position: sticky; bottom: max(8px,env(safe-area-inset-bottom)); z-index: 4; width: 100%; min-height: 52px; justify-content: center; box-shadow: 0 -8px 24px #17191b; }
+  .assignment-workflow .assignment-history article { grid-template-columns: 1fr; align-items: stretch; padding: 14px; }
+  .assignment-workflow .assignment-history button { min-height: 44px; width: 100%; }
+  .assignment-workflow .assignment-timeline > div { grid-template-columns: 1fr; gap: 4px; padding: 12px 0; }
+  .record-actions { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+  .record-actions .journey-primary { min-width: max-content; width: auto; padding: 0 15px; }
   .dashboard-hero + .stats {
     margin-top: 16px;
   }

@@ -43,7 +43,14 @@ export async function GET() {
     const user = await authenticatedOwner();
     await ready();
     const data = await env.DB.prepare(
-      'SELECT * FROM bookings WHERE owner_id=? ORDER BY pickup_at DESC',
+      `SELECT b.*,a.id AS active_assignment_id,a.status AS assignment_status
+       FROM bookings b
+       LEFT JOIN booking_assignments a ON a.id=(
+         SELECT ba.id FROM booking_assignments ba
+         WHERE ba.owner_id=b.owner_id AND ba.booking_id=b.id AND ba.active=1
+         ORDER BY ba.id DESC LIMIT 1
+       )
+       WHERE b.owner_id=? ORDER BY b.pickup_at DESC`,
     )
       .bind(user.userId)
       .all();
