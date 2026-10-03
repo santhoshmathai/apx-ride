@@ -725,14 +725,14 @@ function Bookings({
   const shown = tab === 'complete' ? filtered.slice((page - 1) * 10, page * 10) : filtered;
   const sendInvoice = async (booking: Booking) => { if (!confirm(`Send formal invoice to ${booking.customer_email || 'the customer email on this booking'}?`)) return; const response=await fetch('/api/invoices',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bookingId:booking.id})}); const value=await response.json() as {error?:string;status?:string}; if(!response.ok&&response.status!==202){alert(value.error||'Invoice could not be sent');return;} alert(`Invoice ${value.status==='SENT'?'sent':'queued for delivery'}.`); };
   const journeyAction = async (booking: Booking, action: 'START_JOURNEY'|'BACK_TO_ACTIVE'|'ADMIN_NEXT') => {
-    if (!booking.active_assignment_id) { setStartRequested(true); setAssigning(booking); return; }
-    if (action==='ADMIN_NEXT'&&booking.assignment_status==='PASSENGER_ONBOARD'&&!confirm('Complete this journey? This records the assignment as completed.')) return;
+    if (!booking.active_assignment_id) { setStartRequested(true); setAssigning(booking); return false; }
     setActioning(booking.id);
     const response=await fetch('/api/assignments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bookingId:booking.id,assignmentId:booking.active_assignment_id,action})});
     const value=await response.json() as {error?:string;conflicts?:string[]};
     setActioning(null);
-    if(!response.ok){alert([value.error,...(value.conflicts||[])].filter(Boolean).join('\n'));return;}
+    if(!response.ok){alert([value.error,...(value.conflicts||[])].filter(Boolean).join('\n'));return false;}
     await changed();
+    return true;
   };
   return (
     <Page
@@ -776,6 +776,7 @@ function Bookings({
               </small>
               <h3>{b.pickup} <span>→</span> {b.dropoff}</h3>
               <p>{b.passenger_name} · {b.fleet_tier} · {b.booking_type || 'CASH'}</p>
+              <p className="booking-taken"><b>Booking taken:</b> {b.booking_received_at ? new Date(b.booking_received_at).toLocaleString('en-GB') : 'Not recorded'}{b.responded_by ? ` · ${b.responded_by}` : ''}</p>
               {b.driver_name ? <p className="booking-assignment-summary"><b>Driver:</b> {b.driver_name}{b.driver_licence ? ` · ${b.driver_licence}` : ''} <b>Vehicle:</b> {b.vehicle_registration || 'Not recorded'}{b.vehicle_licence ? ` · ${b.vehicle_licence}` : ''}</p> : b.status === 'upcoming' ? <p className="booking-assignment-warning">Driver and vehicle not assigned</p> : null}
               {b.assignment_status && <p className="booking-journey-state"><b>{b.assignment_status.replaceAll('_',' ')}</b></p>}
             </div>
@@ -797,7 +798,7 @@ function Bookings({
               {b.status === 'in_progress' && b.assignment_status==='EN_ROUTE' && <button className="invoice-action journey-primary" disabled={actioning===b.id} onClick={() => void journeyAction(b,'ADMIN_NEXT')} title="Mark Driver arrived"><Check /><span>Mark Arrived</span></button>}
               {b.status === 'in_progress' && b.assignment_status==='EN_ROUTE' && <button className="invoice-action" disabled={actioning===b.id} onClick={() => void journeyAction(b,'BACK_TO_ACTIVE')} title="Return journey to active"><Undo2 /><span>Back to Active</span></button>}
               {b.status === 'in_progress' && b.assignment_status==='ARRIVED' && <button className="invoice-action journey-primary" disabled={actioning===b.id} onClick={() => void journeyAction(b,'ADMIN_NEXT')} title="Record passenger onboard"><Check /><span>Passenger Onboard</span></button>}
-              {b.status === 'in_progress' && b.assignment_status==='PASSENGER_ONBOARD' && <button className="invoice-action journey-primary" disabled={actioning===b.id} onClick={() => void journeyAction(b,'ADMIN_NEXT')} title="Complete journey"><Check /><span>Complete Journey</span></button>}
+              {b.status === 'in_progress' && b.assignment_status==='PASSENGER_ONBOARD' && <button className="invoice-action journey-primary" disabled={actioning===b.id} onClick={() => setFinishing(b)} title="Complete journey and record payment method"><Check /><span>Complete Journey</span></button>}
               {b.status === 'in_progress' && <button className="invoice-action" onClick={() => { setStartRequested(false); setAssigning(b); }} title="Open assignment details and audit history"><UsersRound /><span>Details</span></button>}
               {b.status !== 'complete' && <button onClick={() => setMessaging(b)} title="Message passenger"><Mail /></button>}
               {b.status !== 'complete' && <button onClick={() => remove(b.id)} title="Remove"><Trash2 /></button>}
@@ -808,7 +809,7 @@ function Bookings({
       {tab === 'complete' && filtered.length > 10 && <div className="pager"><button disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</button><span>Showing {(page - 1) * 10 + 1}–{Math.min(page * 10, filtered.length)} of {filtered.length}</span><button disabled={page * 10 >= filtered.length} onClick={() => setPage(page + 1)}>Next</button></div>}
       {messaging && <QuickMessage booking={messaging} templates={messageTemplates} close={() => setMessaging(null)} />}
       {assigning && <AssignmentManager booking={assigning} startRequested={startRequested} close={() => { setAssigning(null); setStartRequested(false); }} changed={changed} />}
-      {finishing && <PaymentModal booking={finishing} close={() => setFinishing(null)} confirm={(method) => { done(finishing.id, 'complete', method); setFinishing(null); }} />}
+      {finishing && <PaymentModal booking={finishing} close={() => setFinishing(null)} confirm={async (method) => { const completed=await journeyAction(finishing,'ADMIN_NEXT'); if(!completed)return; await done(finishing.id,'complete',method); setFinishing(null); }} />}
     </Page>
   );
 }
@@ -859,7 +860,7 @@ function PaymentModal({
 }: {
   booking: Booking;
   close: () => void;
-  confirm: (method: 'CASH' | 'CARD') => void;
+  confirm: (method: 'CASH' | 'CARD') => void | Promise<void>;
 }) {
   const [method, setMethod] = useState<'CASH' | 'CARD'>('CASH');
   return (
@@ -885,12 +886,12 @@ function PaymentModal({
             onChange={(e) => setMethod(e.target.value as 'CASH' | 'CARD')}
           >
             <option>CASH</option>
-            <option>CARD</option>
+            <option value="CARD">ONLINE / CARD</option>
           </select>
         </label>
         <footer>
           <button onClick={close}>Cancel</button>
-          <button className="primary" onClick={() => confirm(method)}>
+          <button className="primary" onClick={() => void confirm(method)}>
             <Check />
             Complete job
           </button>
@@ -1499,6 +1500,11 @@ function BookingModal({
             />
           </label>
           <label>
+            Booking taken date &amp; time
+            <input value={new Date(booking?.booking_received_at || Date.now()).toLocaleString('en-GB')} readOnly />
+            <input name="bookingReceivedAt" type="hidden" value={booking?.booking_received_at || new Date().toISOString()} />
+          </label>
+          <label>
             Operator
             <select
               name="operator"
@@ -1583,7 +1589,7 @@ function BookingModal({
             Notes
             <textarea name="notes" rows={3} defaultValue={booking?.notes} />
           </label>
-          <label className="wide">Person who took the booking<input value={booking?.responded_by || staffEmail} readOnly /></label>
+          <label className="wide">Person who took the booking<input name="respondedBy" defaultValue={booking?.responded_by || staffEmail} required /></label>
         </div>
         <footer>
           <button type="button" onClick={close}>

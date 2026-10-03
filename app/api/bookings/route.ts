@@ -69,6 +69,8 @@ export async function POST(req: Request) {
     const hirerName = String(b.hirerName || '').trim(), passengerName = String(b.passengerName || '').trim();
     if (!hirerName && !passengerName) return NextResponse.json({ error: 'Enter either a Hirer name or a Passenger name.' }, { status: 400 });
     const now = new Date().toISOString();
+    const respondedBy = typeof b.respondedBy === 'string' && b.respondedBy.trim() ? b.respondedBy.trim().slice(0,254) : user.email;
+    const bookingReceivedAt = typeof b.bookingReceivedAt === 'string' && b.bookingReceivedAt ? b.bookingReceivedAt : now;
     const result = await env.DB.prepare(
       `INSERT INTO bookings(owner_id,hirer_name,passenger_name,customer_email,phone,pickup,dropoff,pickup_at,booking_received_at,responded_by,responded_at,operator,driver_call_sign,driver_name,driver_licence,booking_type,passengers,large_bags,small_bags,fleet_tier,distance,fare,base_fare,airport_fee,toll_fee,tariff,status,notes,retention_until,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     )
@@ -81,8 +83,8 @@ export async function POST(req: Request) {
         b.pickup || '',
         b.dropoff || '',
         b.pickupAt || now,
-        b.bookingReceivedAt || now,
-        user.email,
+        bookingReceivedAt,
+        respondedBy,
         now,
         b.operator || 'APX RIDE',
         b.driverCallSign || '',
@@ -158,8 +160,10 @@ export async function PUT(req: Request) {
     const b = (await req.json()) as Record<string, unknown>;
     const hirerName = String(b.hirerName || '').trim(), passengerName = String(b.passengerName || '').trim();
     if (!hirerName && !passengerName) return NextResponse.json({ error: 'Enter either a Hirer name or a Passenger name.' }, { status: 400 });
+    const respondedBy = typeof b.respondedBy === 'string' && b.respondedBy.trim() ? b.respondedBy.trim().slice(0,254) : user.email;
+    const bookingReceivedAt = typeof b.bookingReceivedAt === 'string' && b.bookingReceivedAt ? b.bookingReceivedAt : new Date().toISOString();
     await env.DB.prepare(
-      `UPDATE bookings SET hirer_name=?,passenger_name=?,customer_email=?,phone=?,pickup=?,dropoff=?,pickup_at=?,booking_received_at=?,operator=?,driver_call_sign=?,driver_name=?,driver_licence=?,booking_type=?,passengers=?,large_bags=?,small_bags=?,fleet_tier=?,distance=?,fare=?,notes=?,retention_until=?,updated_at=? WHERE id=? AND owner_id=?`,
+      `UPDATE bookings SET hirer_name=?,passenger_name=?,customer_email=?,phone=?,pickup=?,dropoff=?,pickup_at=?,booking_received_at=?,responded_by=?,operator=?,driver_call_sign=?,driver_name=?,driver_licence=?,booking_type=?,passengers=?,large_bags=?,small_bags=?,fleet_tier=?,distance=?,fare=?,notes=?,retention_until=?,updated_at=? WHERE id=? AND owner_id=?`,
     )
       .bind(
         hirerName || passengerName,
@@ -169,7 +173,8 @@ export async function PUT(req: Request) {
         b.pickup || '',
         b.dropoff || '',
         b.pickupAt || new Date().toISOString(),
-        b.bookingReceivedAt || new Date().toISOString(),
+        bookingReceivedAt,
+        respondedBy,
         b.operator || 'APX RIDE',
         b.driverCallSign || '',
         b.driverName || '',
