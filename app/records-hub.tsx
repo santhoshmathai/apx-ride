@@ -334,7 +334,10 @@ export function RecordsHub({ area }: { area: 'people' | 'compliance' }) {
   const [tab, setTab] = useState(
     area === 'people' ? 'overview' : 'compliance_overview',
   );
+  const [openDriverId,setOpenDriverId]=useState<string | null>(null);
+  const clearOpenDriver = useCallback(() => setOpenDriverId(null), []);
   const people = area === 'people';
+  useEffect(()=>{if(!people)return;const openDriver=(event:Event)=>{setOpenDriverId((event as CustomEvent<string>).detail);setTab('drivers');};window.addEventListener('apx:open-driver',openDriver);return()=>window.removeEventListener('apx:open-driver',openDriver);},[people]);
   return (
     <>
       <section className="page-head">
@@ -485,7 +488,7 @@ export function RecordsHub({ area }: { area: 'people' | 'compliance' }) {
       ) : tab === 'booking_staff' ? (
         <CouncilStaffRegister />
       ) : tab === 'drivers' ? (
-        <CanonicalDriverRegister view="drivers" />
+        <CanonicalDriverRegister view="drivers" openStaffId={openDriverId} opened={clearOpenDriver} />
       ) : tab === 'vehicles' ? (
         <FleetOverview mode="vehicles" />
       ) : tab === 'vehicle_assignments' ? (
@@ -817,7 +820,7 @@ function CouncilProcedures() {
   );
 }
 
-function CanonicalDriverRegister({ view }: { view: 'drivers' }) {
+function CanonicalDriverRegister({ view, openStaffId, opened }: { view: 'drivers'; openStaffId?: string | null; opened?: () => void }) {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [editing, setEditing] = useState<StaffMember | null>(null);
   const [loading, setLoading] = useState(true);
@@ -839,6 +842,7 @@ function CanonicalDriverRegister({ view }: { view: 'drivers' }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  useEffect(()=>{if(!openStaffId||!staff.length)return;const member=staff.find((item)=>item.id===openStaffId);if(member){setEditing(member);opened?.();}},[openStaffId,staff,opened]);
   const addDriver = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form=event.currentTarget,email=String(new FormData(form).get('email')||'').trim().toLowerCase();

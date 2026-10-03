@@ -723,7 +723,7 @@ function Bookings({
   ).filter((b) => tab !== 'complete' || ((!from || b.pickup_at.slice(0, 10) >= from) && (!to || b.pickup_at.slice(0, 10) <= to)))
     .sort((a, b) => a.pickup_at.localeCompare(b.pickup_at));
   const shown = tab === 'complete' ? filtered.slice((page - 1) * 10, page * 10) : filtered;
-  const sendInvoice = async (booking: Booking) => { if (!confirm(`Send formal invoice to ${booking.customer_email || 'the customer email on this booking'}?`)) return; const response=await fetch('/api/invoices',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bookingId:booking.id})}); const value=await response.json() as {error?:string;status?:string}; if(!response.ok&&response.status!==202){alert(value.error||'Invoice could not be sent');return;} alert(`Invoice ${value.status==='SENT'?'sent':'queued for delivery'}.`); };
+  const sendInvoice = async (booking: Booking) => { const entered=prompt('Customer email address for this invoice',booking.customer_email||''); if(entered===null)return; const customerEmail=entered.trim().toLowerCase(); if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)){alert('Enter a valid customer email address.');return;} if(!confirm(`Send the formal invoice to ${customerEmail}?`))return; const response=await fetch('/api/invoices',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bookingId:booking.id,customerEmail})}); const value=await response.json() as {error?:string;status?:string}; if(!response.ok&&response.status!==202){alert(value.error||'Invoice could not be sent');return;} await changed(); alert(`Invoice ${value.status==='SENT'?'sent':'queued for delivery'} to ${customerEmail}.`); };
   const journeyAction = async (booking: Booking, action: 'START_JOURNEY'|'BACK_TO_ACTIVE'|'ADMIN_NEXT') => {
     if (!booking.active_assignment_id) { setStartRequested(true); setAssigning(booking); return false; }
     setActioning(booking.id);
@@ -789,7 +789,6 @@ function Bookings({
                 <Eye />
               </button>
               {b.status === 'complete' && <button className="invoice-action" onClick={() => printTripInvoice(b)} title="Generate trip invoice"><FileText /><span>Invoice</span></button>}
-              {b.status === 'complete' && <button className="invoice-action" onClick={() => void shareReceiptByEmail(b)} title="Prepare receipt and open email"><Mail /><span>Email receipt</span></button>}
               {b.status === 'complete' && <button className="invoice-action" onClick={() => void sendInvoice(b)} title="Email formal invoice"><Mail /><span>Email invoice</span></button>}
               {b.status !== 'complete' && <button onClick={() => edit(b)} title="Edit booking"><Pencil /></button>}
               {['upcoming','in_progress'].includes(b.status) && <button onClick={() => { setStartRequested(false); setAssigning(b); }} title="Assign Driver / manage assignment" aria-label="Assign Driver / manage assignment"><UsersRound /></button>}
@@ -2577,23 +2576,6 @@ function printTripInvoice(booking: Booking) {
   const invoiceNumber = `APX-INV-${String(booking.id).padStart(5, '0')}`;
   popup.document.write(`<!doctype html><html><head><title>${invoiceNumber}</title><style>@page{size:A4;margin:18mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#222;margin:0}header{text-align:center;border-bottom:2px solid #bd9225;padding:14px 0 24px;margin-bottom:30px}header b{font-size:30px;letter-spacing:.16em}header span{display:block;margin-top:7px;font-size:11px;letter-spacing:.38em;color:#666}h1{font-size:20px;text-transform:uppercase;margin:0 0 22px}.client{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;padding:18px;border:1px solid #ddd;margin-bottom:26px}.client small,.route small{display:block;color:#666;text-transform:uppercase;font-size:10px;letter-spacing:.12em;margin-bottom:6px}.client b{font-size:15px}.route{padding:18px 0;border-top:1px solid #ddd;border-bottom:1px solid #ddd;margin-bottom:24px}.route div+div{margin-top:14px}.route b{display:block;font-size:15px}.charges{width:100%;border-collapse:collapse}.charges th,.charges td{text-align:left;padding:13px 8px;border-bottom:1px solid #ddd}.charges th:last-child,.charges td:last-child{text-align:right}.subtotal{margin-top:18px;border-top:2px solid #bd9225;border-bottom:2px solid #bd9225;padding:18px 8px;display:flex;justify-content:space-between;font-size:20px;font-weight:bold}footer{margin-top:32px;color:#666;font-size:11px}@media print{button{display:none}}</style></head><body><header><b>APX RIDE</b><span>ELEVATE EVERY MILE</span></header><h1>Trip Invoice</h1><section class="client"><div><small>Passenger Name</small><b>${safe(booking.passenger_name)}</b></div><div><small>Invoice #</small><b>${invoiceNumber}</b></div><div><small>Invoice Date</small><b>${new Date().toLocaleDateString('en-GB')}</b></div></section><section class="route"><div><small>Pickup</small><b>${safe(booking.pickup)}</b></div><div><small>Drop-off</small><b>${safe(booking.dropoff)}</b></div><div><small>Journey</small><b>${safe(fmtDate(booking.pickup_at))} · ${safe(fmtTime(booking.pickup_at))} · ${safe(booking.fleet_tier)}</b></div></section><table class="charges"><thead><tr><th>Completed journey charges</th><th>Amount</th></tr></thead><tbody>${rows.map(([label, amount]) => `<tr><td>${label}</td><td>£${amount.toFixed(2)}</td></tr>`).join('')}</tbody></table><div class="subtotal"><span>Sub Total</span><strong>£${booking.fare.toFixed(2)}</strong></div><footer>Invoice reference ${invoiceNumber} · Booking APX-${String(booking.id).padStart(5, '0')}</footer><script>window.addEventListener('load',()=>window.print())<\/script></body></html>`);
   popup.document.close();
-}
-
-async function shareReceiptByEmail(booking: Booking) {
-  const reference = `APX-RCPT-${String(booking.id).padStart(5, '0')}`;
-  const recipient = window.prompt('Confirm the passenger email address', booking.customer_email || '');
-  if (!recipient) return;
-  if (!/^\S+@\S+\.\S+$/.test(recipient)) { alert('Enter a valid email address.'); return; }
-  const text = `APX RIDE journey receipt\n\nReceipt: ${reference}\nPassenger: ${booking.passenger_name || booking.hirer_name || 'Not specified'}\nJourney: ${booking.pickup} to ${booking.dropoff}\nDate: ${new Date(booking.pickup_at).toLocaleString('en-GB')}\nAmount received: £${booking.fare.toFixed(2)}\n\nThis receipt confirms payment for the completed journey.`;
-  const file = new File([text], `${reference}.txt`, { type: 'text/plain' });
-  const shareNavigator = navigator as Navigator & { canShare?: (data: ShareData) => boolean };
-  if (navigator.share && shareNavigator.canShare?.({ files: [file] })) {
-    try { await navigator.share({ title: `APX RIDE receipt ${reference}`, text: `Send this receipt to ${recipient}`, files: [file] }); return; } catch (error) { if ((error as Error).name === 'AbortError') return; }
-  }
-  const url = URL.createObjectURL(file), link = document.createElement('a');
-  link.href = url; link.download = file.name; link.click(); URL.revokeObjectURL(url);
-  window.location.href = `mailto:${encodeURIComponent(recipient)}?subject=${encodeURIComponent(`APX RIDE journey receipt ${reference}`)}&body=${encodeURIComponent(`Hello,\n\nPlease find the APX RIDE journey receipt for booking APX-${String(booking.id).padStart(5, '0')}.\n\nThe receipt file has been downloaded; please attach it before sending.\n\nAPX RIDE`)}`;
-  alert('The receipt was downloaded and your email composer was opened. Please attach the downloaded receipt before pressing Send. Browsers cannot attach a file to an email automatically.');
 }
 
 function printCustomerDocument(input: {

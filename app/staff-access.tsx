@@ -358,15 +358,9 @@ export function StaffAccess({
                 <div className="staff-row-actions">
                   {Boolean(member.has_driver_profile) && (
                     <button
-                      onClick={() =>
-                        window.dispatchEvent(
-                          new CustomEvent('apx:navigate', {
-                            detail: 'Operations',
-                          }),
-                        )
-                      }
+                      onClick={() => window.dispatchEvent(new CustomEvent('apx:open-driver',{detail:member.id}))}
                     >
-                      Open Operations
+                      Open Driver Record
                     </button>
                   )}
                   {member.role === 'DRIVER' && (
