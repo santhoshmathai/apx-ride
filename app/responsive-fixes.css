@@ -344,6 +344,51 @@
 }
 
 @media (max-width: 760px) {
+  .sidebar {
+    inset: 0 auto 0 0;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    overflow: hidden;
+    padding: max(14px, env(safe-area-inset-top)) 14px max(12px, env(safe-area-inset-bottom));
+    touch-action: pan-y;
+  }
+
+  .sidebar .brand {
+    min-height: 92px;
+    margin: 0;
+    padding: 0 8px 10px;
+  }
+
+  .sidebar .brand img {
+    width: 82px;
+    height: 82px;
+  }
+
+  .sidebar nav {
+    min-height: 0;
+    margin-top: 4px;
+    padding: 4px 4px 14px 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    scrollbar-width: thin;
+  }
+
+  .sidebar nav button {
+    min-height: 48px;
+  }
+
+  .sidebar footer {
+    margin-top: 0;
+    padding: 12px 8px 2px;
+    background: #0d0f10;
+  }
+
   .staff-stats, .staff-grid { grid-template-columns: 1fr; }
   .staff-add-card form { align-items: stretch; flex-direction: column; }
   .staff-row { align-items: stretch; grid-template-columns: 1fr; }
