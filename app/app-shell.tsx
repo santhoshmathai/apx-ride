@@ -845,11 +845,11 @@ function QuickMessage({ booking, templates, close }: { booking: Booking; templat
     .replaceAll('{vehicle}', booking.fleet_tier);
   const [kind, setKind] = useState<keyof MessageTemplates>('enroute');
   const [message, setMessage] = useState(render(templates.enroute));
-  const openSms = async () => {
-    await fetch('/api/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ bookingId: booking.id, channel: 'SMS', recipient: booking.phone, message }) });
-    window.location.href = `sms:${booking.phone}?body=${encodeURIComponent(message)}`;
+  const recordSms = () => {
+    void fetch('/api/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ bookingId: booking.id, channel: 'SMS', recipient: booking.phone, message }) });
   };
-  return <div className="modal"><button className="scrim" onClick={close} /><section className="payment-card quick-message"><header><div><small>PASSENGER MESSAGE</small><h2>{booking.passenger_name}</h2></div><button onClick={close}><X /></button></header><label>Template<select value={kind} onChange={(e) => { const selected = e.target.value as keyof MessageTemplates; setKind(selected); setMessage(render(templates[selected])); }}>{Object.keys(labels).map((key) => <option key={key} value={key}>{labels[key as keyof MessageTemplates]}</option>)}</select></label><label>Message<textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={5} /></label><footer><button onClick={() => navigator.clipboard.writeText(message)}><Copy />Copy</button><button className="primary sms-link" onClick={openSms}>Open SMS</button></footer></section></div>;
+  const smsNumber = booking.phone.replace(/[^\d+]/g, '');
+  return <div className="modal message-workflow"><button className="scrim" onClick={close} /><section className="payment-card quick-message"><header><div><small>PASSENGER MESSAGE</small><h2>{booking.passenger_name}</h2></div><button onClick={close} aria-label="Close message"><X /></button></header><div className="quick-message-fields"><label>Template<select value={kind} onChange={(e) => { const selected = e.target.value as keyof MessageTemplates; setKind(selected); setMessage(render(templates[selected])); }}>{Object.keys(labels).map((key) => <option key={key} value={key}>{labels[key as keyof MessageTemplates]}</option>)}</select></label><label>Message<textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={5} /></label></div><footer><button onClick={() => void navigator.clipboard.writeText(message)}><Copy />Copy</button><a className="primary sms-link" href={`sms:${smsNumber}?body=${encodeURIComponent(message)}`} onClick={recordSms}>Open SMS</a></footer></section></div>;
 }
 
 function PaymentModal({

@@ -151,6 +151,11 @@
 .completed-filter input { display: block; margin-top: 5px; }
 .pager { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 14px; color: #aaa; }
 .quick-message textarea { width: 100%; margin-top: 7px; }
+.quick-message-fields { display: grid; gap: 16px; }
+.quick-message-fields label { display: grid; gap: 7px; color: #aaa; font-size: .75rem; }
+.quick-message-fields select,
+.quick-message-fields textarea { width: 100%; border: 1px solid #34373a; border-radius: 8px; background: #0d0f10; color: #eee; padding: 11px; }
+.quick-message-fields select { min-height: 44px; }
 .sms-link, .backup-link { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
 .records-tabs { overflow-x: auto; }
 .register-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -344,6 +349,81 @@
 }
 
 @media (max-width: 760px) {
+  .message-workflow {
+    align-items: stretch;
+    justify-items: stretch;
+  }
+
+  .message-workflow .scrim {
+    display: none;
+  }
+
+  .message-workflow .quick-message {
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    border: 0;
+    border-radius: 0;
+    padding: 0 16px max(18px, env(safe-area-inset-bottom));
+  }
+
+  .message-workflow .quick-message > header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    margin: 0 -16px 18px;
+    padding: max(12px, env(safe-area-inset-top)) 16px 12px;
+    border-bottom: 1px solid #34373a;
+    background: #151719f5;
+  }
+
+  .message-workflow .quick-message > header h2 {
+    margin-bottom: 0;
+    font-size: 1.2rem;
+  }
+
+  .message-workflow .quick-message > header > button {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    border: 1px solid #3b3e41;
+    border-radius: 10px;
+    background: #111315;
+  }
+
+  .message-workflow .quick-message select,
+  .message-workflow .quick-message textarea {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .message-workflow .quick-message textarea {
+    min-height: 180px;
+    resize: vertical;
+  }
+
+  .message-workflow .quick-message > footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    gap: 10px;
+    margin: 18px -16px 0;
+    padding: 12px 16px max(12px, env(safe-area-inset-bottom));
+    border-top: 1px solid #34373a;
+    background: #151719f5;
+  }
+
+  .message-workflow .quick-message > footer > * {
+    min-height: 48px;
+    flex: 1 1 0;
+    justify-content: center;
+  }
+
   .sidebar {
     inset: 0 auto 0 0;
     height: 100vh;
