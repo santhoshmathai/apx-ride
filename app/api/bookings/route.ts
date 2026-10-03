@@ -57,6 +57,9 @@ export async function GET() {
        LEFT JOIN booking_assignments latest ON latest.id=(
          SELECT history.id FROM booking_assignments history
          WHERE history.owner_id=b.owner_id AND history.booking_id=b.id
+           AND ((b.status='complete' AND history.status='COMPLETED')
+             OR (b.status IN ('upcoming','in_progress') AND history.active=1)
+             OR (b.status NOT IN ('complete','upcoming','in_progress')))
          ORDER BY history.id DESC LIMIT 1
        )
        WHERE b.owner_id=? ORDER BY b.pickup_at DESC`,
