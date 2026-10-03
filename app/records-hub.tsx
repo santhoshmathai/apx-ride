@@ -685,16 +685,21 @@ function AuditHistory() {
   );
 }
 function CouncilExports() {
-  const downloadBookingRegister = async () => {
-    const response = await fetch('/api/council-bookings?format=csv');
+  const downloadRegister = async (url: string, filename: string, emptyMessage: string) => {
+    const response = await fetch(url);
     if (!response.ok) {
       const result = (await response.json().catch(() => ({}))) as { error?: string };
-      alert(result.error || 'The booking and dispatch register could not be generated.');
+      alert(result.error || 'The register could not be generated.');
+      return;
+    }
+    const content = await response.text();
+    if (content.replace(/^\uFEFF/, '').trim().split(/\r?\n/).length < 2) {
+      alert(emptyMessage);
       return;
     }
     download(
-      await response.text(),
-      `apx-ride-council-booking-register-${new Date().toISOString().slice(0, 10)}.csv`,
+      content,
+      `${filename}-${new Date().toISOString().slice(0, 10)}.csv`,
       'text/csv;charset=utf-8',
     );
   };
@@ -750,17 +755,17 @@ function CouncilExports() {
       <div className="records-overview-grid">
         <button
           className="panel export-card"
-          onClick={() => void downloadBookingRegister()}
+          onClick={() => void downloadRegister('/api/council-bookings?format=csv', 'apx-ride-council-booking-register', 'No bookings have been recorded yet.')}
         >
           <strong>Booking and dispatch register</strong>
           <span>
             Bookings, hirer, Driver, vehicle and dispatch attribution.
           </span>
         </button>
-        <a className="panel export-card" href="/api/council-staff?format=csv">
+        <button className="panel export-card" onClick={() => void downloadRegister('/api/council-staff?format=csv', 'apx-ride-council-staff-register', 'No Booking & Dispatch Staff records exist. Add the staff member under Operations → Booking & Dispatch Staff first.')}>
           <strong>Booking &amp; dispatch staff register</strong>
           <span>Roles, DBS sighting and suitability decisions.</span>
-        </a>
+        </button>
         <button className="panel export-card" onClick={() => void print()}>
           <strong>Print full compliance report</strong>
           <span>

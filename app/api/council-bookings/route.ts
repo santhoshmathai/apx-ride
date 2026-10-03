@@ -19,7 +19,8 @@ export async function GET(req: Request) {
   if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   const url = new URL(req.url);
   const id = Number(url.searchParams.get('id'));
-  const where = Number.isSafeInteger(id) && id > 0 ? 'b.owner_id=? AND b.id=?' : 'b.owner_id=?';
+  const hasBookingId = Number.isSafeInteger(id) && id > 0;
+  const where = hasBookingId ? 'b.owner_id=? AND b.id=?' : 'b.owner_id=?';
   const data = await env.DB.prepare(`SELECT 'APX-' || printf('%05d',b.id) AS reference,b.*,
       latest.driver_name_snapshot AS assignment_driver_name,
       latest.driver_licence_snapshot AS assignment_driver_licence,
@@ -32,7 +33,7 @@ export async function GET(req: Request) {
       ORDER BY history.id DESC LIMIT 1
     )
     WHERE ${where} ORDER BY b.pickup_at DESC`)
-    .bind(...(where.includes('id=?') ? [user.userId, id] : [user.userId])).all<Record<string, unknown>>();
+    .bind(...(hasBookingId ? [user.userId, id] : [user.userId])).all<Record<string, unknown>>();
   const rows: Record<string, unknown>[] = data.results.map((row) => ({ ...row,
     driver_name: row.assignment_driver_name || row.driver_name || '',
     driver_licence: row.assignment_driver_licence || row.driver_licence || '',
