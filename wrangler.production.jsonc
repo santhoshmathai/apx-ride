@@ -6,7 +6,10 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "preview_urls": false,
-  "routes": [{ "pattern": "portal-production.apxride.com", "custom_domain": true }],
+  "routes": [
+    { "pattern": "portal.apxride.com", "custom_domain": true },
+    { "pattern": "portal-production.apxride.com", "custom_domain": true }
+  ],
   "assets": { "directory": "dist/client" },
   "vars": {
     "APX_AUTH_MODE": "cloudflare",
