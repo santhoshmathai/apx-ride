@@ -40,44 +40,48 @@ export async function createInvoicePdf(data: InvoicePdfData) {
     wrap(value, maxWidth).forEach((entry, index) => text(entry, x, y - 18 - index * 14, 11, true));
   };
 
-  page.drawRectangle({ x: 0, y: 768, width, height: 74, color: ink });
-  text('APX RIDE', left, 801, 27, true, rgb(1, 1, 1));
-  text('ELEVATE EVERY MILE', left, 782, 9, false, gold);
-  text('TRIP INVOICE', left, 724, 20, true);
-  page.drawRectangle({ x: left, y: 610, width: right - left, height: 86, borderColor: rule, borderWidth: 1 });
-  labelled('Passenger name', data.passengerName, 64, 672, 145);
-  labelled('Invoice #', data.invoiceNumber, 228, 672, 140);
-  labelled('Invoice date', data.invoiceDate, 405, 672, 120);
-  labelled('Pickup', data.pickup, left, 570, right - left);
-  line(510);
-  labelled('Drop-off', data.dropoff, left, 486, right - left);
-  line(426);
-  labelled('Journey', `${data.journeyDate} · ${data.vehicleCategory}`, left, 402, right - left);
+  const centred = (value: string, y: number, size: number, strong = false, color = ink) => {
+    const font = strong ? bold : regular;
+    text(value, (width - font.widthOfTextAtSize(value, size)) / 2, y, size, strong, color);
+  };
+
+  centred('A P X   R I D E', 775, 23, true);
+  centred('E L E V A T E   E V E R Y   M I L E', 755, 8, false, grey);
+  line(730, gold, 1.5);
+  text('TRIP INVOICE', left, 690, 17, true);
+  page.drawRectangle({ x: left, y: 602, width: right - left, height: 66, borderColor: rule, borderWidth: 0.8 });
+  labelled('Passenger name', data.passengerName, 62, 648, 145);
+  labelled('Invoice #', data.invoiceNumber, 220, 648, 145);
+  labelled('Invoice date', data.invoiceDate, 382, 648, 120);
+  line(580);
+  labelled('Pickup', data.pickup, left, 560, right - left);
+  labelled('Drop-off', data.dropoff, left, 516, right - left);
+  labelled('Journey', `${data.journeyDate} · ${data.vehicleCategory}`, left, 472, right - left);
+  line(430);
   const charges = [
     ['Base fare', data.baseFare],
     ...(Number(data.airportFee) > 0 ? [['Airport fee', data.airportFee]] : []),
     ...(Number(data.tollFee) > 0 ? [['Toll fee', data.tollFee]] : []),
   ];
-  const chargeTop = 350;
-  const chargeHeight = 46 + charges.length * 30;
-  page.drawRectangle({ x: left, y: chargeTop - chargeHeight, width: right - left, height: chargeHeight, color: rgb(0.97, 0.97, 0.96) });
-  text('COMPLETED JOURNEY CHARGES', 62, chargeTop - 24, 9, true, grey);
-  text('Amount', 445, chargeTop - 24, 9, true, grey);
+  const chargeTop = 398;
+  text('Completed journey charges', 54, chargeTop, 11, true);
+  const amountHeading = 'Amount';
+  text(amountHeading, right - bold.widthOfTextAtSize(amountHeading, 11), chargeTop, 11, true);
+  line(chargeTop - 14);
   charges.forEach(([label, amount], index) => {
-    const y = chargeTop - 54 - index * 30;
-    text(label, 62, y, 11);
+    const y = chargeTop - 42 - index * 34;
+    text(label, 54, y, 11);
     const price = `£${amount}`;
-    text(price, right - 16 - bold.widthOfTextAtSize(price, 12), y, 12, true);
+    text(price, right - bold.widthOfTextAtSize(price, 11), y, 11);
+    line(y - 14);
   });
-  const totalTop = chargeTop - chargeHeight - 26;
+  const totalTop = chargeTop - 42 - charges.length * 34 - 2;
   line(totalTop, gold, 2);
-  text('SUB TOTAL', 62, totalTop - 34, 15, true);
+  text('Sub Total', 54, totalTop - 32, 15, true);
   const total = `£${data.fare}`;
-  text(total, right - bold.widthOfTextAtSize(total, 21), totalTop - 38, 21, true);
+  text(total, right - bold.widthOfTextAtSize(total, 17), totalTop - 34, 17, true);
   line(totalTop - 54, gold, 2);
-  text(`Invoice reference ${data.invoiceNumber} · Booking ${data.bookingReference}`, left, 122, 9, false, grey);
-  text('Please reply to the accompanying email if any details require correction.', left, 102, 9, false, grey);
-  text('APX RIDE · Formal journey invoice', left, 58, 8, false, grey);
+  text(`Invoice reference ${data.invoiceNumber} · Booking ${data.bookingReference}`, left, totalTop - 88, 8, false, grey);
   document.setTitle(`APX RIDE invoice ${data.invoiceNumber}`);
   document.setAuthor('APX RIDE');
   document.setSubject('Completed journey invoice');
