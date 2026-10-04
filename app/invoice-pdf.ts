@@ -1,3 +1,5 @@
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+
 type InvoicePdfData = {
   invoiceNumber: string;
   invoiceDate: string;
@@ -6,46 +8,79 @@ type InvoicePdfData = {
   dropoff: string;
   journeyDate: string;
   vehicleCategory: string;
+  bookingReference: string;
+  baseFare: string;
+  airportFee: string;
+  tollFee: string;
   fare: string;
 };
 
-const pdfText = (value: string) => value.normalize('NFKD').replace(/[^\x20-\x7e]/g, '').replace(/([\\()])/g, '\\$1');
+const gold = rgb(0.74, 0.57, 0.15);
+const ink = rgb(0.13, 0.13, 0.13);
+const grey = rgb(0.42, 0.42, 0.42);
+const rule = rgb(0.84, 0.84, 0.84);
 
-export function createInvoicePdf(data: InvoicePdfData) {
-  const commands = [
-    '0.84 0.67 0.18 rg', '0 780 595 62 re f',
-    '1 1 1 rg', 'BT /F2 25 Tf 48 812 Td (APX RIDE) Tj ET',
-    '0.16 0.16 0.16 rg', 'BT /F2 18 Tf 48 736 Td (TRIP INVOICE) Tj ET',
-    '0.45 0.45 0.45 rg', 'BT /F1 9 Tf 48 712 Td (ELEVATE EVERY MILE) Tj ET',
-    '0.82 0.82 0.82 RG', '48 688 m 547 688 l S',
-    '0.16 0.16 0.16 rg',
-    `BT /F1 10 Tf 48 660 Td (Passenger) Tj /F2 11 Tf 0 -18 Td (${pdfText(data.passengerName)}) Tj ET`,
-    `BT /F1 10 Tf 310 660 Td (Invoice number) Tj /F2 11 Tf 0 -18 Td (${pdfText(data.invoiceNumber)}) Tj ET`,
-    `BT /F1 10 Tf 48 605 Td (Invoice date) Tj /F2 11 Tf 0 -18 Td (${pdfText(data.invoiceDate)}) Tj ET`,
-    `BT /F1 10 Tf 310 605 Td (Journey date) Tj /F2 11 Tf 0 -18 Td (${pdfText(data.journeyDate)}) Tj ET`,
-    '0.82 0.82 0.82 RG', '48 552 m 547 552 l S',
-    `BT /F1 10 Tf 48 526 Td (Pickup) Tj /F2 11 Tf 0 -18 Td (${pdfText(data.pickup)}) Tj ET`,
-    `BT /F1 10 Tf 48 466 Td (Drop-off) Tj /F2 11 Tf 0 -18 Td (${pdfText(data.dropoff)}) Tj ET`,
-    `BT /F1 10 Tf 48 406 Td (Vehicle category) Tj /F2 11 Tf 0 -18 Td (${pdfText(data.vehicleCategory)}) Tj ET`,
-    '0.84 0.67 0.18 RG', '2 w', '48 332 m 547 332 l S', '48 274 m 547 274 l S',
-    '0.16 0.16 0.16 rg', 'BT /F2 14 Tf 48 300 Td (Completed journey charges) Tj ET',
-    `BT /F2 19 Tf 430 296 Td (GBP ${pdfText(data.fare)}) Tj ET`,
-    `BT /F1 9 Tf 48 228 Td (Invoice reference ${pdfText(data.invoiceNumber)}) Tj ET`,
-    'BT /F1 9 Tf 48 205 Td (Please reply to the accompanying email if any details require correction.) Tj ET',
-  ].join('\n');
-  const objects: string[] = [];
-  objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
-  objects[2] = '<< /Type /Pages /Kids [3 0 R] /Count 1 >>';
-  objects[3] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>';
-  objects[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
-  objects[5] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>';
-  objects[6] = `<< /Length ${commands.length} >>\nstream\n${commands}\nendstream`;
-  let pdf = '%PDF-1.4\n';
-  const offsets = [0];
-  for (let id = 1; id < objects.length; id++) { offsets[id] = pdf.length; pdf += `${id} 0 obj\n${objects[id]}\nendobj\n`; }
-  const xref = pdf.length;
-  pdf += `xref\n0 ${objects.length}\n0000000000 65535 f \n`;
-  for (let id = 1; id < objects.length; id++) pdf += `${String(offsets[id]).padStart(10, '0')} 00000 n \n`;
-  pdf += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
-  return new TextEncoder().encode(pdf);
+export async function createInvoicePdf(data: InvoicePdfData) {
+  const document = await PDFDocument.create();
+  const page = document.addPage([595.28, 841.89]);
+  const regular = await document.embedFont(StandardFonts.Helvetica);
+  const bold = await document.embedFont(StandardFonts.HelveticaBold);
+  const width = page.getWidth();
+  const left = 48;
+  const right = width - 48;
+  const text = (value: string, x: number, y: number, size = 10, strong = false, color = ink) => page.drawText(value || '-', { x, y, size, font: strong ? bold : regular, color });
+  const line = (y: number, color = rule, thickness = 1) => page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness, color });
+  const wrap = (value: string, maxWidth: number, size = 11) => {
+    const words = (value || '-').split(/\s+/); const lines: string[] = []; let current = '';
+    for (const word of words) { const next = current ? `${current} ${word}` : word; if (regular.widthOfTextAtSize(next, size) <= maxWidth) current = next; else { if (current) lines.push(current); current = word; } }
+    if (current) lines.push(current); return lines.slice(0, 3);
+  };
+  const labelled = (label: string, value: string, x: number, y: number, maxWidth = 220) => {
+    text(label.toUpperCase(), x, y, 8, false, grey);
+    wrap(value, maxWidth).forEach((entry, index) => text(entry, x, y - 18 - index * 14, 11, true));
+  };
+
+  page.drawRectangle({ x: 0, y: 768, width, height: 74, color: ink });
+  text('APX RIDE', left, 801, 27, true, rgb(1, 1, 1));
+  text('ELEVATE EVERY MILE', left, 782, 9, false, gold);
+  text('TRIP INVOICE', left, 724, 20, true);
+  page.drawRectangle({ x: left, y: 610, width: right - left, height: 86, borderColor: rule, borderWidth: 1 });
+  labelled('Passenger name', data.passengerName, 64, 672, 145);
+  labelled('Invoice #', data.invoiceNumber, 228, 672, 140);
+  labelled('Invoice date', data.invoiceDate, 405, 672, 120);
+  labelled('Pickup', data.pickup, left, 570, right - left);
+  line(510);
+  labelled('Drop-off', data.dropoff, left, 486, right - left);
+  line(426);
+  labelled('Journey', `${data.journeyDate} · ${data.vehicleCategory}`, left, 402, right - left);
+  const charges = [
+    ['Base fare', data.baseFare],
+    ...(Number(data.airportFee) > 0 ? [['Airport fee', data.airportFee]] : []),
+    ...(Number(data.tollFee) > 0 ? [['Toll fee', data.tollFee]] : []),
+  ];
+  const chargeTop = 350;
+  const chargeHeight = 46 + charges.length * 30;
+  page.drawRectangle({ x: left, y: chargeTop - chargeHeight, width: right - left, height: chargeHeight, color: rgb(0.97, 0.97, 0.96) });
+  text('COMPLETED JOURNEY CHARGES', 62, chargeTop - 24, 9, true, grey);
+  text('Amount', 445, chargeTop - 24, 9, true, grey);
+  charges.forEach(([label, amount], index) => {
+    const y = chargeTop - 54 - index * 30;
+    text(label, 62, y, 11);
+    const price = `£${amount}`;
+    text(price, right - 16 - bold.widthOfTextAtSize(price, 12), y, 12, true);
+  });
+  const totalTop = chargeTop - chargeHeight - 26;
+  line(totalTop, gold, 2);
+  text('SUB TOTAL', 62, totalTop - 34, 15, true);
+  const total = `£${data.fare}`;
+  text(total, right - bold.widthOfTextAtSize(total, 21), totalTop - 38, 21, true);
+  line(totalTop - 54, gold, 2);
+  text(`Invoice reference ${data.invoiceNumber} · Booking ${data.bookingReference}`, left, 122, 9, false, grey);
+  text('Please reply to the accompanying email if any details require correction.', left, 102, 9, false, grey);
+  text('APX RIDE · Formal journey invoice', left, 58, 8, false, grey);
+  document.setTitle(`APX RIDE invoice ${data.invoiceNumber}`);
+  document.setAuthor('APX RIDE');
+  document.setSubject('Completed journey invoice');
+  document.setCreationDate(new Date());
+  return document.save();
 }
