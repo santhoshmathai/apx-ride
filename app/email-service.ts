@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 
 type EmailEnvironment = { RESEND_API_KEY?: string; RESEND_WEBHOOK_SECRET?: string };
-type OutboxRow = { id: number; organisation_id: string; recipient: string; copy_to: string; subject: string; message: string; status: string; attempts: number; sender_name: string; sender_email: string; reply_to_email: string; notification_copy_email: string };
+type OutboxRow = { id: number; organisation_id: string; recipient: string; copy_to: string; subject: string; message: string; status: string; attempts: number; sender_name: string; sender_email: string; reply_to_email: string; notification_copy_email: string; attachment_object_key: string; attachment_filename: string; attachment_content_type: string };
 
 const runtime = () => env as unknown as EmailEnvironment;
 const retryMinutes = [1, 5, 30, 120, 720];
@@ -10,6 +10,7 @@ function escapeHtml(value: string) { return value.replaceAll('&', '&amp;').repla
 function emailHtml(message: string) {
   return `<!doctype html><html><body style="margin:0;background:#f4f4f2;font-family:Arial,sans-serif;color:#222"><div style="max-width:640px;margin:0 auto;padding:32px 18px"><div style="background:#111315;padding:24px;text-align:center;border-bottom:3px solid #d8aa2d"><strong style="color:#fff;font-size:26px;letter-spacing:4px">APX RIDE</strong><div style="color:#d8aa2d;font-size:11px;letter-spacing:3px;margin-top:6px">ELEVATE EVERY MILE</div></div><div style="background:#fff;padding:30px;border:1px solid #ddd;border-top:0"><div style="font-size:16px;line-height:1.7">${escapeHtml(message).replaceAll('\n', '<br>')}</div><p style="margin:28px 0 0;padding-top:18px;border-top:1px solid #ddd;color:#777;font-size:12px">This is a service message about an APX RIDE booking request. Please reply to this email if any details are incorrect.</p></div></div></body></html>`;
 }
+function base64(bytes: Uint8Array) { let binary = ''; for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000)); return btoa(binary); }
 
 export function emailConfigured() { return Boolean(runtime().RESEND_API_KEY); }
 export function webhookConfigured() { return Boolean(runtime().RESEND_WEBHOOK_SECRET); }
@@ -27,6 +28,14 @@ export async function sendOutbox(outboxId: number, organisationId: string, allow
   const copy = row.copy_to || row.notification_copy_email;
   const payload: Record<string, unknown> = { from: `${row.sender_name} <${row.sender_email}>`, to: [row.recipient], subject: row.subject, text: row.message, html: emailHtml(row.message), reply_to: row.reply_to_email };
   if (copy && copy.toLowerCase() !== row.recipient.toLowerCase()) payload.bcc = [copy];
+  if (row.attachment_object_key) {
+    const attachment = await env.BUCKET.get(row.attachment_object_key);
+    if (!attachment) {
+      await env.DB.prepare("UPDATE notification_outbox SET status='FAILED',last_error=?,last_attempt_at=? WHERE id=? AND organisation_id=?").bind('Invoice attachment is missing from private storage.', now, row.id, organisationId).run();
+      return { ok: false, configured: true, status: 'FAILED', error: 'Invoice attachment is missing from private storage.' };
+    }
+    payload.attachments = [{ filename: row.attachment_filename, content: base64(new Uint8Array(await attachment.arrayBuffer())), content_type: row.attachment_content_type || 'application/pdf' }];
+  }
   try {
     const response = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json', 'idempotency-key': `apx-outbox-${row.id}` }, body: JSON.stringify(payload) });
     const result = await response.json().catch(() => ({})) as { id?: string; message?: string; name?: string };
@@ -56,6 +65,13 @@ export async function processDueOutbox(organisationId: string, limit = 10) {
   const due = await env.DB.prepare("SELECT id FROM notification_outbox WHERE organisation_id=? AND (status='PREPARED' OR (status='RETRY' AND (next_attempt_at='' OR next_attempt_at<=?))) ORDER BY created_at LIMIT ?").bind(organisationId, new Date().toISOString(), limit).all<{ id: number }>();
   const results = [];
   for (const item of due.results) results.push(await sendOutbox(item.id, organisationId));
+  return results;
+}
+
+export async function processAllDueOutbox(limit = 25) {
+  const due = await env.DB.prepare("SELECT id,organisation_id FROM notification_outbox WHERE status='PREPARED' OR (status='RETRY' AND (next_attempt_at='' OR next_attempt_at<=?)) ORDER BY created_at LIMIT ?").bind(new Date().toISOString(), limit).all<{ id: number; organisation_id: string }>();
+  const results = [];
+  for (const item of due.results) results.push(await sendOutbox(item.id, item.organisation_id));
   return results;
 }
 

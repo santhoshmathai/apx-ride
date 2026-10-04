@@ -23,7 +23,7 @@ export default defineConfig(async ({ mode }) => {
     ? { d1: 'DB', r2: 'BUCKET' }
     : (await import('./.openai/hosting.json')).default;
   const localBindingConfig = {
-    main: 'vinext/server/fetch-handler',
+    main: independentCloudflareBuild ? './worker.ts' : 'vinext/server/fetch-handler',
     compatibility_flags: ['nodejs_compat'],
     d1_databases: d1
       ? [{

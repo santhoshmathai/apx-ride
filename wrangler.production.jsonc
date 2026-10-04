@@ -26,5 +26,8 @@
     "binding": "BUCKET",
     "bucket_name": "apx-ride-production-documents",
     "jurisdiction": "eu"
-  }]
+  }],
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  }
 }
