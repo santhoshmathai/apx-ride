@@ -190,8 +190,8 @@ const schemas: Record<
     ],
   },
   council_incident: {
-    label: 'Council Incidents',
-    singular: 'Council incident',
+    label: 'Incidents',
+    singular: 'Incident',
     statuses: ['WAITING FOR REPLY', 'REPORTED TO COUNCIL', 'REPORT CONFIRMED'],
     fields: [
       {
@@ -520,7 +520,7 @@ function ComplianceOverview({ navigate }: { navigate: (tab: string) => void }) {
         </span>
       </button>
       <button className="panel" onClick={() => navigate('complaint')}>
-        <small>CUSTOMER SAFEGUARDING</small>
+        <small>CUSTOMER COMPLAINTS</small>
         <strong>Complaints</strong>
         <span>
           Preserve the complainant, Driver, licence, investigation and outcome.
@@ -615,7 +615,7 @@ function RecordsOverview({ navigate }: { navigate: (tab: string) => void }) {
         <span>Manage sign-in, roles, onboarding and offboarding.</span>
       </button>
       <button className="panel" onClick={() => navigate('booking_staff')}>
-        <small>COUNCIL REGISTER</small>
+        <small>STAFF REGISTER</small>
         <strong>{counts.staff} active booking/dispatch staff</strong>
         <span>DBS sighting, suitability and operational duties.</span>
       </button>

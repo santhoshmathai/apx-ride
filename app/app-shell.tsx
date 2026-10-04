@@ -69,6 +69,8 @@ type Booking = {
   driver_licence?: string;
   vehicle_registration?: string;
   vehicle_licence?: string;
+  vehicle_make?: string;
+  vehicle_model?: string;
   active_assignment_id?: number;
   assignment_status?: string;
   retention_until?: string;
@@ -98,6 +100,14 @@ const defaultMessageTemplates: MessageTemplates = {
   arrived: 'Good day, {passenger}. Your chauffeur has arrived at {pickup}.',
   review: 'Dear {passenger}, thank you for choosing APX RIDE for your journey to {dropoff}.',
 };
+function bookingVehicleDescription(booking: Booking) {
+  const vehicleName = [booking.vehicle_make, booking.vehicle_model]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  const registration = booking.vehicle_registration?.trim();
+  return [vehicleName, registration].filter(Boolean).join(' · ') || booking.fleet_tier;
+}
 function normaliseRates(value: unknown): TariffRates {
   const input = value as Partial<TariffRates> & Partial<Rates> | null;
   if (input?.day && input?.night) return input as TariffRates;
@@ -842,7 +852,7 @@ function QuickMessage({ booking, templates, close }: { booking: Booking; templat
     .replaceAll('{pickup}', booking.pickup)
     .replaceAll('{dropoff}', booking.dropoff)
     .replaceAll('{driver}', booking.driver_name || 'your assigned driver')
-    .replaceAll('{vehicle}', booking.fleet_tier);
+    .replaceAll('{vehicle}', bookingVehicleDescription(booking));
   const [kind, setKind] = useState<keyof MessageTemplates>('enroute');
   const [message, setMessage] = useState(render(templates.enroute));
   const recordSms = () => {
@@ -1862,7 +1872,7 @@ function Messages({ items, templates, saveTemplates }: { items: Booking[]; templ
         .replaceAll('{pickup}', b.pickup)
         .replaceAll('{dropoff}', b.dropoff)
         .replaceAll('{driver}', 'your assigned driver')
-        .replaceAll('{vehicle}', b.fleet_tier)
+        .replaceAll('{vehicle}', bookingVehicleDescription(b))
     : draft;
   const saveTemplate = () => {
     const t = { ...templates, [kind]: draft };

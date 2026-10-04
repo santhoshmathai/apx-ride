@@ -908,12 +908,8 @@ export function CouncilStaffRegister() {
   return (
     <article className="panel staff-list-card">
       <div className="head">
-        <small>COUNCIL STAFF REGISTER</small>
+        <small>STAFF REGISTER</small>
         <h3>Booking and dispatch staff</h3>
-        <p>
-          Operational staff suitability record. DBS certificates are sighted but
-          never uploaded or retained.
-        </p>
       </div>
       <div className="page-actions">
         <a className="button" href="/api/council-staff?format=csv">
@@ -1043,7 +1039,7 @@ function CouncilStaffModal({
       <form className="record-modal" onSubmit={submit}>
         <header>
           <div>
-            <small>COUNCIL STAFF REGISTER</small>
+            <small>STAFF REGISTER</small>
             <h2>{row ? 'Update' : 'Add'} staff member</h2>
           </div>
           <button type="button" onClick={close}>
@@ -1155,10 +1151,6 @@ function CouncilStaffModal({
             />
           </label>
         </div>
-        <p className="private-document-note">
-          Record only that the original DBS certificate was seen, when it was
-          seen and by whom. Do not upload, scan or retain the certificate here.
-        </p>
         {row && (
           <ProfileDocuments
             entityType="STAFF"

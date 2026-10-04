@@ -47,7 +47,9 @@ export async function GET() {
          latest.driver_name_snapshot AS assignment_driver_name,
          latest.driver_licence_snapshot AS assignment_driver_licence,
          latest.vehicle_registration_snapshot AS assignment_vehicle_registration,
-         latest.vehicle_licence_snapshot AS assignment_vehicle_licence
+         latest.vehicle_licence_snapshot AS assignment_vehicle_licence,
+         assignment_vehicle.vehicle_make AS assignment_vehicle_make,
+         assignment_vehicle.vehicle_model AS assignment_vehicle_model
        FROM bookings b
        LEFT JOIN booking_assignments a ON a.id=(
          SELECT ba.id FROM booking_assignments ba
@@ -62,6 +64,9 @@ export async function GET() {
              OR (b.status NOT IN ('complete','upcoming','in_progress')))
          ORDER BY history.id DESC LIMIT 1
        )
+       LEFT JOIN driver_vehicles assignment_vehicle
+         ON assignment_vehicle.id=latest.vehicle_id
+         AND assignment_vehicle.owner_id=b.owner_id
        WHERE b.owner_id=? ORDER BY b.pickup_at DESC`,
     )
       .bind(user.userId)
@@ -72,6 +77,8 @@ export async function GET() {
       driver_licence: row.assignment_driver_licence || row.driver_licence || '',
       vehicle_registration: row.assignment_vehicle_registration || row.vehicle_registration || '',
       vehicle_licence: row.assignment_vehicle_licence || row.vehicle_licence || '',
+      vehicle_make: row.assignment_vehicle_make || '',
+      vehicle_model: row.assignment_vehicle_model || '',
     })));
   } catch (error) {
     return authError(error);
