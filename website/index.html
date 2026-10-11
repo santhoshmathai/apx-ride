@@ -39,6 +39,7 @@
       <div class="booking-card">
         <section class="tab-panel active" id="request-panel" aria-label="Booking request">
           <form id="request-form" class="form-grid">
+            <label>Hirer name (if different)<input name="hirerName" autocomplete="name"></label>
             <label>Passenger name<input name="passengerName" autocomplete="name" required></label>
             <label>Email address<input name="email" type="email" autocomplete="email" required></label>
             <label>Mobile number<input name="phone" type="tel" autocomplete="tel" required></label>
@@ -52,9 +53,9 @@
             <label class="wide">Anything else we should know?<textarea name="notes" rows="3" placeholder="Child seats, accessibility requirements or journey notes"></textarea></label>
             <label aria-hidden="true" style="display:none">Website<input name="website" tabindex="-1" autocomplete="off"></label>
             <label class="consent wide"><input name="privacy" type="checkbox" required><span>I agree that APX RIDE may use these details to respond to this booking request. Submitting a request does not confirm the journey.</span></label>
-            <div class="cf-turnstile wide" data-sitekey="1x00000000000000000000AA" data-theme="light"></div>
-            <div class="connection-notice wide"><b>Test mode — public bookings are not open yet.</b><span>Only the APX RIDE bookings test email can submit a request. Other addresses will not be stored or contacted. A request is not a confirmed booking.</span></div>
-            <button class="button primary wide" type="submit">Send test request</button>
+            <div class="cf-turnstile wide" data-sitekey="0x4AAAAAAFT4ZDJoH_0shNgO" data-theme="light"></div>
+            <div class="connection-notice wide"><b>This form sends a booking request.</b><span>APX RIDE will confirm availability and fare separately. Your journey is not booked until you receive a booking confirmation.</span></div>
+            <button class="button primary wide" type="submit">Send booking request</button>
           </form>
           <div class="request-summary" id="request-summary" hidden aria-live="polite"></div>
         </section>

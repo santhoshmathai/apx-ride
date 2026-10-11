@@ -51,6 +51,16 @@ export async function PUT(req: Request) {
   if (!user) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   const orgId = await ensureOrganisation(user);
   const body = await req.json() as Record<string, unknown>;
+  if (body.action === 'PUBLIC_INTAKE') {
+    if (typeof body.enabled !== 'boolean') return NextResponse.json({ error: 'Choose whether public booking requests are enabled.' }, { status: 400 });
+    const enabled = body.enabled;
+    const now = new Date().toISOString();
+    await env.DB.batch([
+      env.DB.prepare('UPDATE public_booking_settings SET public_bookings_enabled=?,updated_at=? WHERE organisation_id=?').bind(enabled ? 1 : 0, now, orgId),
+      env.DB.prepare('INSERT INTO audit_events(owner_id,actor_email,action,entity_type,entity_id,summary,created_at) VALUES(?,?,?,?,?,?,?)').bind(user.userId, user.email, enabled ? 'ENABLE_PUBLIC_BOOKINGS' : 'DISABLE_PUBLIC_BOOKINGS', 'public_booking_settings', orgId, enabled ? 'Enabled public website booking requests' : 'Disabled public website booking requests', now),
+    ]);
+    return NextResponse.json({ ok: true, publicBookingsEnabled: enabled });
+  }
   const acknowledgement = requiredText(body.acknowledgementTemplate, 2000), confirmation = requiredText(body.confirmationTemplate, 2000), unavailable = requiredText(body.unavailableTemplate, 2000), cancellation = requiredText(body.cancellationTemplate, 2000);
   if (!acknowledgement || !confirmation || !unavailable || !cancellation) return NextResponse.json({ error: 'All four notification templates are required.' }, { status: 400 });
   await env.DB.prepare('UPDATE public_booking_settings SET acknowledgement_template=?,confirmation_template=?,unavailable_template=?,cancellation_template=?,updated_at=? WHERE organisation_id=?').bind(acknowledgement, confirmation, unavailable, cancellation, new Date().toISOString(), orgId).run();

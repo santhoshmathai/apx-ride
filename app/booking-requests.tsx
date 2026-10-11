@@ -37,13 +37,21 @@ export function BookingRequests({ bookingSaved, staffEmail }: { bookingSaved: ()
     await refresh(); bookingSaved(); return true;
   };
   const markReview = async (request: BookingRequest) => { await update({ id: request.id, action: 'REVIEW' }); };
+  const setPublicIntake = async () => {
+    const enabled = !data.publicBookingsEnabled;
+    if (!window.confirm(`${enabled ? 'Enable' : 'Disable'} booking requests from apxride.com?`)) return;
+    const response = await fetch('/api/booking-requests', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'PUBLIC_INTAKE', enabled }) });
+    const result = await response.json() as { error?: string };
+    if (!response.ok) { alert(result.error || 'Public booking intake could not be changed.'); return; }
+    await refresh();
+  };
   return <section className="booking-requests-page">
     <section className="page-head request-page-head"><div><small>PUBLIC BOOKING INTAKE</small><h2>Booking requests</h2><p>Review every enquiry before it becomes a confirmed dispatch.</p></div><button className="primary" onClick={() => setAdding(true)}><Plus />Add request</button></section>
     <div className="request-summary-grid">
       <article><Clock3 /><span>Awaiting action</span><b>{groups.open.length}</b><small>New or under review</small></article>
       <article><Check /><span>Accepted</span><b>{groups.accepted.length}</b><small>Converted to bookings</small></article>
       <article><Mail /><span>Prepared emails</span><b>{data.preparedNotifications}</b><small>Ready for Phase 2 delivery</small></article>
-      <article><FileQuestion /><span>Public intake</span><b>{data.publicBookingsEnabled ? 'ON' : 'OFF'}</b><small>{data.publicBookingsEnabled ? 'Website requests enabled' : 'Enabled with public website'}</small></article>
+      <article><FileQuestion /><span>Public intake</span><b>{data.publicBookingsEnabled ? 'ON' : 'OFF'}</b><small>{data.publicBookingsEnabled ? 'Website requests enabled' : 'Website requests are paused'}</small><button type="button" onClick={() => void setPublicIntake()}>{data.publicBookingsEnabled ? 'Pause intake' : 'Enable intake'}</button></article>
     </div>
     <EmailServicePanel settings={data.notificationTemplates} refreshed={() => void refresh()} />
     <div className="request-secondary-actions"><button onClick={() => setShowTemplates(!showTemplates)}><Mail />{showTemplates ? 'Hide' : 'Edit'} email templates</button><button onClick={() => setShowNotifications(!showNotifications)}><Clock3 />{showNotifications ? 'Hide' : 'View'} notification history</button></div>
