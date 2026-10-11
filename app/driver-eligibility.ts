@@ -13,6 +13,10 @@ export type DriverEligibilityRow = {
   private_hire_licence_expiry: string | null;
   dvla_licence_number: string | null;
   dvla_licence_expiry: string | null;
+  dvla_share_code: string | null;
+  dvla_check_completed_at: string | null;
+  dvla_next_check_due: string | null;
+  dvla_review_interval_months: number | null;
   address_evidence_status: string | null;
   vehicle_id: string | null;
   vehicle_active: number | null;
@@ -53,7 +57,8 @@ export function driverOnlyEligibilityReasons(row: DriverEligibilityRow, today = 
   if (!row.profile_active) reasons.push('Driver profile is inactive');
   if (!row.full_name || !row.phone || !row.licensing_authority) reasons.push('Driver contact or licensing authority is incomplete');
   if (!row.private_hire_licence_number || !validFutureDate(row.private_hire_licence_expiry, today)) reasons.push('Private-hire Driver licence is missing or expired');
-  if (!row.dvla_licence_number || !validFutureDate(row.dvla_licence_expiry, today)) reasons.push('DVLA licence is missing or expired');
+  if (!row.dvla_share_code || !row.dvla_check_completed_at || !validFutureDate(row.dvla_next_check_due, today)) reasons.push('DVLA Share Code check is missing or overdue');
+  if (!validFutureDate(row.dvla_licence_expiry, today)) reasons.push('DVLA licence validity is missing or expired');
   if (row.address_evidence_status !== 'VERIFIED') reasons.push('Address evidence is not verified');
   if (!row.approved_for_assignment) reasons.push('Driver is not approved for assignment');
   return reasons;
@@ -82,7 +87,7 @@ export const driverEligibilitySelect = `
   SELECT s.id,s.email,s.role,s.active AS staff_active,
     CASE WHEN s.access_subject IS NULL THEN 0 ELSE 1 END AS identity_verified,
     p.id AS profile_id,p.active AS profile_active,p.approved_for_assignment,p.full_name,p.first_name,p.surname,p.address,p.phd_badge_number,p.dbs_status,p.right_to_work_status,p.visa_status,p.emergency_contact,p.phone,p.licensing_authority,
-    p.private_hire_licence_number,p.private_hire_licence_expiry,p.dvla_licence_number,p.dvla_licence_expiry,p.address_evidence_status,
+    p.private_hire_licence_number,p.private_hire_licence_expiry,p.dvla_licence_number,p.dvla_licence_expiry,p.dvla_share_code,p.dvla_check_completed_at,p.dvla_next_check_due,p.dvla_review_interval_months,p.address_evidence_status,
     v.id AS vehicle_id,v.active AS vehicle_active,v.approved AS vehicle_approved,v.registration,v.make_model_colour,v.vehicle_make,v.vehicle_model,v.vehicle_colour,v.vehicle_category,v.phv_badge_number,v.registered_keeper_address,v.insurance_valid_from,v.in_term_mot_date,
     v.private_hire_vehicle_licence_number,v.private_hire_vehicle_licence_expiry,v.mot_expiry,v.insurance_expiry,v.v5_document_status
   FROM portal_staff s

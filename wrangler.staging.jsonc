@@ -23,5 +23,8 @@
     "binding": "BUCKET",
     "bucket_name": "apx-ride-staging-documents",
     "jurisdiction": "eu"
-  }]
+  }],
+  "triggers": {
+    "crons": ["15 7 * * *"]
+  }
 }

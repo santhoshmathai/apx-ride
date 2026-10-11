@@ -68,7 +68,7 @@ const schemas: Record<
         type: 'date',
         required: true,
       },
-      { name: 'dvlaNumber', label: 'DVLA licence number' },
+      { name: 'dvlaNumber', label: 'DVLA Share Code' },
       { name: 'dbsDate', label: 'DBS check date', type: 'date' },
       { name: 'address', label: 'Current address', required: true },
       { name: 'engagementDate', label: 'Engagement start date', type: 'date' },

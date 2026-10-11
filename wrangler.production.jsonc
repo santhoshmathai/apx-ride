@@ -28,6 +28,6 @@
     "jurisdiction": "eu"
   }],
   "triggers": {
-    "crons": ["*/5 * * * *"]
+    "crons": ["*/5 * * * *", "15 7 * * *"]
   }
 }

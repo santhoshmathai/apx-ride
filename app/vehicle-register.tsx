@@ -1,5 +1,5 @@
 'use client';
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Link2, Plus, Trash2, X } from 'lucide-react';
 import { ProfileDocuments, type StaffMember } from './staff-access';
 
@@ -30,6 +30,16 @@ type Assignment = Record<string, string | number> & {
   approved: number;
   primary_vehicle: number;
 };
+type ExpiryItem = {
+  alert_key: string;
+  entity_type: 'DRIVER' | 'VEHICLE';
+  entity_id: string;
+  entity_label: string;
+  document_type: string;
+  due_date: string;
+  severity: 'MISSING' | 'OVERDUE' | 'CRITICAL' | 'DUE_SOON' | 'UPCOMING' | 'FUTURE';
+  days_remaining: number | null;
+};
 const getJson = async <T,>(url: string): Promise<T> => {
   const response = await fetch(url);
   const value = (await response.json()) as T & { error?: string };
@@ -44,43 +54,51 @@ export function FleetOverview({
 }) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]),
     [assignments, setAssignments] = useState<Assignment[]>([]),
-    [staff, setStaff] = useState<StaffMember[]>([]);
+    [staff, setStaff] = useState<StaffMember[]>([]),
+    [expiryItems, setExpiryItems] = useState<ExpiryItem[]>([]),
+    [checkedAt, setCheckedAt] = useState('');
   const [editing, setEditing] = useState<Vehicle | null | undefined>(),
     [assigning, setAssigning] = useState(false),
     [error, setError] = useState('');
   const refresh = useCallback(async () => {
     try {
-      const [v, a, s] = await Promise.all([
+      const [v, a, s, expiry] = await Promise.all([
         getJson<Vehicle[]>('/api/vehicles'),
         getJson<Assignment[]>('/api/vehicle-assignments'),
         getJson<StaffMember[]>('/api/staff'),
+        mode === 'expiring' ? getJson<{ checkedAt: string; items: ExpiryItem[] }>('/api/compliance-expiry') : Promise.resolve({ checkedAt: '', items: [] }),
       ]);
       setVehicles(v);
       setAssignments(a);
       setStaff(s.filter((member) => member.profile_id));
+      setExpiryItems(expiry.items);
+      setCheckedAt(expiry.checkedAt);
       setError('');
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : 'Could not load fleet',
       );
     }
-  }, []);
+  }, [mode]);
   useEffect(() => {
     void refresh();
   }, [refresh]);
-  const expiring = useMemo(() => {
-    const limit = new Date(Date.now() + 30 * 86400000)
-      .toISOString()
-      .slice(0, 10);
-    const today = new Date().toISOString().slice(0, 10);
-    return vehicles.filter((v) =>
-      [
-        v.mot_expiry,
-        v.insurance_expiry,
-        v.private_hire_vehicle_licence_expiry,
-      ].some((value) => value && value >= today && value <= limit),
-    );
-  }, [vehicles]);
+  if (mode === 'expiring') return (
+    <section className="panel compliance-register">
+      <RegisterHead eyebrow="AUTOMATIC 3 / 6 MONTH REVIEW" title="Expiring Driver and vehicle documents" />
+      <p className="private-document-note">Automatically checked daily. Records are shown when missing, overdue or due within the next six months.{checkedAt ? ` Last refreshed ${new Date(checkedAt).toLocaleString('en-GB')}.` : ''}</p>
+      {error && <p className="staff-message error">{error}</p>}
+      <div className="staff-list">
+        {expiryItems.map((item) => (
+          <div className="staff-row" key={item.alert_key}>
+            <div><strong>{item.entity_label}</strong><span>{item.entity_type === 'DRIVER' ? 'Driver' : 'Vehicle'} · {item.document_type}</span><span>{item.due_date ? `Due ${item.due_date}` : 'Required date is missing'}</span></div>
+            <div className="staff-badges"><span className={['MISSING','OVERDUE','CRITICAL'].includes(item.severity) ? 'inactive' : 'pending'}>{item.severity === 'DUE_SOON' ? 'Due within 30 days' : item.severity === 'UPCOMING' ? 'Due within 3 months' : item.severity === 'FUTURE' ? 'Due within 6 months' : item.severity.toLowerCase()}</span>{item.days_remaining !== null && <span className="pending">{item.days_remaining < 0 ? `${Math.abs(item.days_remaining)} days overdue` : `${item.days_remaining} days remaining`}</span>}</div>
+          </div>
+        ))}
+      </div>
+      {!expiryItems.length && <p className="empty-register">All active Driver and vehicle compliance dates are current beyond the next six months.</p>}
+    </section>
+  );
   if (mode === 'assignments')
     return (
       <section className="panel compliance-register">
@@ -151,14 +169,12 @@ export function FleetOverview({
         )}
       </section>
     );
-  const displayed = mode === 'expiring' ? expiring : vehicles;
+  const displayed = vehicles;
   return (
     <section className="panel compliance-register">
       <RegisterHead
-        eyebrow={
-          mode === 'expiring' ? 'NEXT 30 DAYS' : 'COUNCIL VEHICLE REGISTER'
-        }
-        title={mode === 'expiring' ? 'Expiring vehicle documents' : 'Vehicles'}
+        eyebrow="COUNCIL VEHICLE REGISTER"
+        title="Vehicles"
         action={
           mode === 'vehicles' ? (
             <button className="primary" onClick={() => setEditing(null)}>
@@ -205,9 +221,7 @@ export function FleetOverview({
       </div>
       {!displayed.length && (
         <p className="empty-register">
-          {mode === 'expiring'
-            ? 'No vehicle documents expire in the next 30 days.'
-            : 'No vehicles have been added. Use Add Vehicle to create the first fleet record.'}
+          No vehicles have been added. Use Add Vehicle to create the first fleet record.
         </p>
       )}
       {editing !== undefined && (

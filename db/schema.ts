@@ -268,6 +268,10 @@ export const driverProfiles = sqliteTable('driver_profiles', {
   privateHireLicenceExpiry: text('private_hire_licence_expiry').notNull().default(''),
   dvlaLicenceNumber: text('dvla_licence_number').notNull().default(''),
   dvlaLicenceExpiry: text('dvla_licence_expiry').notNull().default(''),
+  dvlaShareCode: text('dvla_share_code').notNull().default(''),
+  dvlaCheckCompletedAt: text('dvla_check_completed_at').notNull().default(''),
+  dvlaNextCheckDue: text('dvla_next_check_due').notNull().default(''),
+  dvlaReviewIntervalMonths: integer('dvla_review_interval_months').notNull().default(3),
   addressEvidenceStatus: text('address_evidence_status').notNull().default('MISSING'),
   active: integer('active').notNull().default(1),
   approvedForAssignment: integer('approved_for_assignment').notNull().default(0),
@@ -330,6 +334,23 @@ export const profileDocuments = sqliteTable('profile_documents', {
   objectKey: text('object_key').notNull(),
   uploadedAt: text('uploaded_at').notNull(),
 }, (table) => [index('idx_profile_documents_entity').on(table.organisationId, table.entityType, table.entityId)]);
+
+export const complianceAlerts = sqliteTable('compliance_alerts', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  organisationId: text('organisation_id').notNull(),
+  ownerId: text('owner_id').notNull(),
+  entityType: text('entity_type').notNull(),
+  entityId: text('entity_id').notNull(),
+  entityLabel: text('entity_label').notNull(),
+  documentType: text('document_type').notNull(),
+  dueDate: text('due_date').notNull(),
+  severity: text('severity').notNull(),
+  alertKey: text('alert_key').notNull(),
+  status: text('status').notNull().default('OPEN'),
+  firstAlertedAt: text('first_alerted_at').notNull(),
+  lastCheckedAt: text('last_checked_at').notNull(),
+  resolvedAt: text('resolved_at').notNull().default(''),
+}, (table) => [uniqueIndex('idx_compliance_alert_key').on(table.alertKey), index('idx_compliance_alerts_org_status').on(table.organisationId, table.status, table.dueDate)]);
 
 export const publicBookingSettings = sqliteTable('public_booking_settings', {
   organisationId: text('organisation_id').primaryKey(),

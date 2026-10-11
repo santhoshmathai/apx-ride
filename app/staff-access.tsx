@@ -589,9 +589,16 @@ export function DriverProfileEditor({
             required
           />
           <Field
-            name="dvlaLicenceNumber"
-            label="DVLA licence number"
-            value={value('dvla_licence_number')}
+            name="dvlaShareCode"
+            label="DVLA Share Code"
+            value={value('dvla_share_code')}
+            required
+          />
+          <Field
+            name="dvlaCheckCompletedAt"
+            label="DVLA check completed"
+            value={value('dvla_check_completed_at')}
+            type="date"
             required
           />
           <Field
@@ -601,6 +608,17 @@ export function DriverProfileEditor({
             type="date"
             required
           />
+          <label>
+            DVLA review interval
+            <select name="dvlaReviewIntervalMonths" defaultValue={value('dvla_review_interval_months') || '3'}>
+              <option value="3">Every 3 months</option>
+              <option value="6">Every 6 months</option>
+            </select>
+          </label>
+          <label>
+            Next DVLA check due
+            <input value={value('dvla_next_check_due') || 'Calculated after saving'} readOnly />
+          </label>
           <SelectStatus
             name="addressEvidenceStatus"
             label="Address evidence"

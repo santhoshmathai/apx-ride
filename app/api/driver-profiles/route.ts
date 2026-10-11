@@ -7,8 +7,8 @@ import { validMutationOrigin } from '../../request-security';
 type ProfileBody = {
   staffId?: unknown; fullName?: unknown; phone?: unknown; licensingAuthority?: unknown;
   firstName?: unknown; surname?: unknown; address?: unknown; phdBadgeNumber?: unknown; dbsStatus?: unknown; rightToWorkStatus?: unknown; visaStatus?: unknown; emergencyContact?: unknown; medicalExemption?: unknown;
-  privateHireLicenceNumber?: unknown; privateHireLicenceExpiry?: unknown; dvlaLicenceNumber?: unknown;
-  dvlaLicenceExpiry?: unknown; addressEvidenceStatus?: unknown; profileActive?: unknown;
+  privateHireLicenceNumber?: unknown; privateHireLicenceExpiry?: unknown; dvlaShareCode?: unknown;
+  dvlaLicenceExpiry?: unknown; dvlaCheckCompletedAt?: unknown; dvlaReviewIntervalMonths?: unknown; addressEvidenceStatus?: unknown; profileActive?: unknown;
   registration?: unknown; makeModelColour?: unknown; privateHireVehicleLicenceNumber?: unknown;
   vehicleMake?: unknown; vehicleModel?: unknown; vehicleColour?: unknown; vehicleCategory?: unknown; phvBadgeNumber?: unknown; registeredKeeperAddress?: unknown; insuranceValidFrom?: unknown; inTermMotDate?: unknown;
   privateHireVehicleLicenceExpiry?: unknown; motExpiry?: unknown; insuranceExpiry?: unknown;
@@ -17,6 +17,15 @@ type ProfileBody = {
 
 const text = (value: unknown, max = 120) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 const status = (value: unknown) => value === 'VERIFIED' ? 'VERIFIED' : 'MISSING';
+const date = (value: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(text(value, 10)) ? text(value, 10) : '';
+function addMonths(value: string, months: number) {
+  if (!value) return '';
+  const source = new Date(`${value}T00:00:00Z`);
+  const target = new Date(Date.UTC(source.getUTCFullYear(), source.getUTCMonth() + months, 1));
+  const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(source.getUTCDate(), lastDay));
+  return target.toISOString().slice(0, 10);
+}
 
 async function admin() {
   if (!cloudflareAuthEnabled()) return null;
@@ -48,15 +57,15 @@ export async function PUT(req: Request) {
   const values = {
     firstName: text(body.firstName), surname: text(body.surname), fullName: `${text(body.firstName)} ${text(body.surname)}`.trim() || text(body.fullName), address: text(body.address,500), phdBadgeNumber:text(body.phdBadgeNumber), dbsStatus:status(body.dbsStatus), rightToWorkStatus:status(body.rightToWorkStatus), visaStatus:text(body.visaStatus,30)||'NOT_REQUIRED', emergencyContact:text(body.emergencyContact,300), medicalExemption:body.medicalExemption===true?1:0, phone: text(body.phone, 40), licensingAuthority: text(body.licensingAuthority),
     privateHireLicenceNumber: text(body.privateHireLicenceNumber), privateHireLicenceExpiry: text(body.privateHireLicenceExpiry, 10),
-    dvlaLicenceNumber: text(body.dvlaLicenceNumber), dvlaLicenceExpiry: text(body.dvlaLicenceExpiry, 10), addressEvidenceStatus: status(body.addressEvidenceStatus),
+    dvlaShareCode: text(body.dvlaShareCode, 40), dvlaLicenceExpiry: date(body.dvlaLicenceExpiry), dvlaCheckCompletedAt: date(body.dvlaCheckCompletedAt), dvlaReviewIntervalMonths: Number(body.dvlaReviewIntervalMonths) === 6 ? 6 : 3, addressEvidenceStatus: status(body.addressEvidenceStatus),
     profileActive: body.profileActive === false ? 0 : 1, approved: body.approvedForAssignment === true ? 1 : 0,
   };
   if (existing) {
-    await env.DB.prepare('UPDATE driver_profiles SET full_name=?,first_name=?,surname=?,address=?,phd_badge_number=?,dbs_status=?,right_to_work_status=?,visa_status=?,emergency_contact=?,medical_exemption=?,phone=?,licensing_authority=?,private_hire_licence_number=?,private_hire_licence_expiry=?,dvla_licence_number=?,dvla_licence_expiry=?,address_evidence_status=?,active=?,approved_for_assignment=?,updated_at=? WHERE id=? AND organisation_id=?')
-      .bind(values.fullName,values.firstName,values.surname,values.address,values.phdBadgeNumber,values.dbsStatus,values.rightToWorkStatus,values.visaStatus,values.emergencyContact,values.medicalExemption,values.phone, values.licensingAuthority, values.privateHireLicenceNumber, values.privateHireLicenceExpiry, values.dvlaLicenceNumber, values.dvlaLicenceExpiry, values.addressEvidenceStatus, values.profileActive, values.approved, now, profileId, user.organisationId).run();
+    await env.DB.prepare('UPDATE driver_profiles SET full_name=?,first_name=?,surname=?,address=?,phd_badge_number=?,dbs_status=?,right_to_work_status=?,visa_status=?,emergency_contact=?,medical_exemption=?,phone=?,licensing_authority=?,private_hire_licence_number=?,private_hire_licence_expiry=?,dvla_share_code=?,dvla_licence_expiry=?,dvla_check_completed_at=?,dvla_next_check_due=?,dvla_review_interval_months=?,address_evidence_status=?,active=?,approved_for_assignment=?,updated_at=? WHERE id=? AND organisation_id=?')
+      .bind(values.fullName,values.firstName,values.surname,values.address,values.phdBadgeNumber,values.dbsStatus,values.rightToWorkStatus,values.visaStatus,values.emergencyContact,values.medicalExemption,values.phone, values.licensingAuthority, values.privateHireLicenceNumber, values.privateHireLicenceExpiry, values.dvlaShareCode, values.dvlaLicenceExpiry, values.dvlaCheckCompletedAt, addMonths(values.dvlaCheckCompletedAt, values.dvlaReviewIntervalMonths), values.dvlaReviewIntervalMonths, values.addressEvidenceStatus, values.profileActive, values.approved, now, profileId, user.organisationId).run();
   } else {
-    await env.DB.prepare('INSERT INTO driver_profiles(id,organisation_id,owner_id,staff_id,full_name,first_name,surname,address,phd_badge_number,dbs_status,right_to_work_status,visa_status,emergency_contact,medical_exemption,phone,licensing_authority,private_hire_licence_number,private_hire_licence_expiry,dvla_licence_number,dvla_licence_expiry,address_evidence_status,active,approved_for_assignment,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-      .bind(profileId,user.organisationId,user.ownerId,staffId,values.fullName,values.firstName,values.surname,values.address,values.phdBadgeNumber,values.dbsStatus,values.rightToWorkStatus,values.visaStatus,values.emergencyContact,values.medicalExemption,values.phone,values.licensingAuthority,values.privateHireLicenceNumber,values.privateHireLicenceExpiry,values.dvlaLicenceNumber,values.dvlaLicenceExpiry,values.addressEvidenceStatus,values.profileActive,values.approved,now,now).run();
+    await env.DB.prepare('INSERT INTO driver_profiles(id,organisation_id,owner_id,staff_id,full_name,first_name,surname,address,phd_badge_number,dbs_status,right_to_work_status,visa_status,emergency_contact,medical_exemption,phone,licensing_authority,private_hire_licence_number,private_hire_licence_expiry,dvla_share_code,dvla_licence_expiry,dvla_check_completed_at,dvla_next_check_due,dvla_review_interval_months,address_evidence_status,active,approved_for_assignment,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(profileId,user.organisationId,user.ownerId,staffId,values.fullName,values.firstName,values.surname,values.address,values.phdBadgeNumber,values.dbsStatus,values.rightToWorkStatus,values.visaStatus,values.emergencyContact,values.medicalExemption,values.phone,values.licensingAuthority,values.privateHireLicenceNumber,values.privateHireLicenceExpiry,values.dvlaShareCode,values.dvlaLicenceExpiry,values.dvlaCheckCompletedAt,addMonths(values.dvlaCheckCompletedAt,values.dvlaReviewIntervalMonths),values.dvlaReviewIntervalMonths,values.addressEvidenceStatus,values.profileActive,values.approved,now,now).run();
   }
   const updated = await env.DB.prepare(`${driverEligibilitySelect} WHERE s.id=? AND s.organisation_id=? AND s.owner_id=?`).bind(staffId, user.organisationId, user.ownerId).first<Record<string, unknown> & DriverEligibilityRow>();
   if (!updated) return NextResponse.json({ error: 'Could not reload Driver profile' }, { status: 500 });
